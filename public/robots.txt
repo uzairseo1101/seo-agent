@@ -1,0 +1,49 @@
+# RankPilot AI robots.txt
+# Entity LLM Reference: https://rankpilot.ai/llms.txt
+
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /signin
+Disallow: /signup
+Disallow: /login
+Disallow: /register
+
+# Search Engine & AI Answer Engine Bots explicitly welcomed
+User-agent: Googlebot
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: GPTBot
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/
+
+Sitemap: https://rankpilot.ai/sitemap.xml

@@ -68,6 +68,18 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: 'Content',
+    items: [
+      { name: 'Content Briefs', href: '/dashboard/opportunities?tab=content', icon: FileText },
+    ],
+  },
+  {
+    title: 'Competitors',
+    items: [
+      { name: 'Competitors', href: '/dashboard/opportunities?tab=competitors', icon: Layers },
+    ],
+  },
+  {
     title: 'Reports',
     items: [
       { name: 'Agency Reports', href: '/dashboard/reports', icon: FileText },

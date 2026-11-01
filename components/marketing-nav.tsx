@@ -1,99 +1,151 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Compass, Menu, X, ArrowRight, ShieldCheck } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Compass, Menu, X, ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function MarketingNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navLinks = [
+    { name: 'Home', href: '/' },
+    { name: 'How it works', href: '/how-it-works' },
+    { name: 'Features', href: '/features' },
+    { name: 'Pricing', href: '/pricing' },
+  ];
 
   return (
-    <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b border-border transition-colors">
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white shadow-xs">
-              <Compass className="w-4.5 h-4.5" />
+    <>
+      {/* Skip to Content for WCAG AA Keyboard Accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-md focus:shadow-pop"
+      >
+        Skip to main content
+      </a>
+
+      <header
+        className={cn(
+          'sticky top-0 z-50 bg-card/95 backdrop-blur-md transition-all duration-200',
+          isScrolled ? 'border-b border-border shadow-xs' : 'border-b border-transparent'
+        )}
+      >
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 rounded-md">
+              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white shadow-xs">
+                <Compass className="w-4.5 h-4.5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-head font-bold text-lg text-text tracking-tight leading-none">
+                  RankPilot <span className="text-primary font-semibold">AI</span>
+                </span>
+                <span className="text-[10px] text-muted font-medium tracking-wider uppercase mt-0.5">
+                  AI SEO Agent
+                </span>
+              </div>
+            </Link>
+
+            {/* Desktop Navigation Links */}
+            <nav className="hidden md:flex items-center gap-7 text-sm font-medium" aria-label="Main Navigation">
+              {navLinks.map((link) => {
+                const isActive = pathname === link.href;
+                return (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    className={cn(
+                      'transition-colors py-1',
+                      isActive
+                        ? 'text-primary font-semibold border-b-2 border-primary'
+                        : 'text-muted hover:text-text'
+                    )}
+                  >
+                    {link.name}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* CTAs: Sign in (ghost), Start free (single green primary button) */}
+            <div className="hidden sm:flex items-center gap-3">
+              <Link
+                href="/signin"
+                className="text-sm font-medium text-muted hover:text-text px-3.5 h-10 inline-flex items-center justify-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-white bg-primary hover:bg-primary-hover px-4 h-10 rounded-md shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+              >
+                <span>Start free</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-            <div className="flex flex-col">
-              <span className="font-head font-bold text-lg text-text tracking-tight leading-none">
-                RankPilot <span className="text-primary font-semibold">AI</span>
-              </span>
-              <span className="text-[10px] text-muted font-medium tracking-wider uppercase mt-0.5">
-                SEO & Action Platform
-              </span>
+
+            {/* Mobile menu toggle */}
+            <div className="flex md:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-md text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+                aria-label="Toggle navigation menu"
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
             </div>
-          </Link>
-
-          {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-muted">
-            <Link href="/features" className="hover:text-text transition-colors">Features</Link>
-            <Link href="/how-it-works" className="hover:text-text transition-colors">How It Works</Link>
-            <Link href="/seo-website-audit" className="hover:text-text transition-colors">Audits</Link>
-            <Link href="/geo-optimization" className="hover:text-text transition-colors">GEO</Link>
-            <Link href="/aeo-optimization" className="hover:text-text transition-colors">AEO</Link>
-            <Link href="/gsc-intelligence" className="hover:text-text transition-colors">GSC</Link>
-            <Link href="/action-management" className="hover:text-text transition-colors">Tasks</Link>
-            <Link href="/pricing" className="hover:text-text transition-colors">Pricing</Link>
-            <Link href="/trust-and-methodology" className="flex items-center gap-1 text-accent hover:text-accent/80 font-medium transition-colors">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Trust</span>
-            </Link>
-          </nav>
-
-          {/* CTA Buttons */}
-          <div className="hidden sm:flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-muted hover:text-text px-3.5 h-10 inline-flex items-center justify-center rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-white bg-primary hover:bg-primary-hover px-4 h-10 rounded-md shadow-xs transition-colors"
-            >
-              <span>Get Started</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="flex lg:hidden">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-md text-muted hover:text-text hover:bg-slate-100"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Menu Dropdown */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-border bg-card px-4 pt-3 pb-6 space-y-2">
-          <Link href="/features" className="block text-sm font-medium py-1.5 text-text hover:text-primary">Features</Link>
-          <Link href="/how-it-works" className="block text-sm font-medium py-1.5 text-text hover:text-primary">How It Works</Link>
-          <Link href="/seo-website-audit" className="block text-sm font-medium py-1.5 text-text hover:text-primary">SEO Website Audit</Link>
-          <Link href="/geo-optimization" className="block text-sm font-medium py-1.5 text-text hover:text-primary">GEO Optimization</Link>
-          <Link href="/aeo-optimization" className="block text-sm font-medium py-1.5 text-text hover:text-primary">AEO Optimization</Link>
-          <Link href="/gsc-intelligence" className="block text-sm font-medium py-1.5 text-text hover:text-primary">GSC Intelligence</Link>
-          <Link href="/action-management" className="block text-sm font-medium py-1.5 text-text hover:text-primary">Action Center</Link>
-          <Link href="/pricing" className="block text-sm font-medium py-1.5 text-text hover:text-primary">Pricing</Link>
-          <Link href="/trust-and-methodology" className="block text-sm font-medium py-1.5 text-accent">Trust & Methodology</Link>
-          <div className="pt-3 border-t border-border flex flex-col gap-2">
-            <Link href="/login" className="text-center text-sm font-medium h-10 flex items-center justify-center rounded-md border border-border text-text bg-card hover:bg-slate-50">
-              Sign In
-            </Link>
-            <Link href="/dashboard" className="text-center text-sm font-medium h-10 flex items-center justify-center rounded-md bg-primary hover:bg-primary-hover text-white shadow-xs">
-              Get Started
-            </Link>
+        {/* Mobile Navigation Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-b border-border bg-card px-4 pt-3 pb-6 space-y-3 animate-in fade-in">
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(
+                  'block text-sm font-medium py-2',
+                  pathname === link.href ? 'text-primary font-semibold' : 'text-muted hover:text-text'
+                )}
+              >
+                {link.name}
+              </Link>
+            ))}
+            <div className="pt-3 border-t border-border flex flex-col gap-2">
+              <Link
+                href="/signin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-center text-xs font-medium h-10 flex items-center justify-center rounded-md border border-border text-text bg-card hover:bg-slate-50"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-center text-xs font-medium h-10 flex items-center justify-center rounded-md bg-primary hover:bg-primary-hover text-white shadow-xs"
+              >
+                Start free
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
-    </header>
+        )}
+      </header>
+    </>
   );
 }

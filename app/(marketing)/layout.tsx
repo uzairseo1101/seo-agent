@@ -10,7 +10,7 @@ export default function MarketingLayout({
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text transition-colors">
       <MarketingNav />
-      <main className="flex-1">{children}</main>
+      <main id="main-content" className="flex-1">{children}</main>
       <MarketingFooter />
     </div>
   );

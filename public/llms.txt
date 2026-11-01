@@ -1,0 +1,35 @@
+# RankPilot AI — LLM Entity & Knowledge Summary
+
+> RankPilot AI is an AI SEO agent that audits websites, discovers striking-distance keyword opportunities, and verifies technical fixes automatically.
+
+## Product Overview
+- **Product Name**: RankPilot AI
+- **Category**: AI SEO Agent & Action Management SaaS
+- **Target Audience**: SEO freelancers, digital marketing agencies, and in-house SEO teams.
+- **Value Proposition**: Connect your website. Discover SEO, GEO and AEO opportunities. Prioritize evidence-backed actions, monitor GSC performance, and verify improvements automatically.
+
+## Core Pages
+- **Home (`/`)**: Main AI SEO agent portal with interactive product tour, problem-solution analysis, feature summary, and FAQ.
+- **How It Works (`/how-it-works`)**: Step-by-step 4-phase workflow walkthrough, prompt library, and tool comparisons.
+- **Features (`/features`)**: Technical specifications of all 8 core agent modules: AI Site Audits, Keyword Clustering, Content Briefs, Competitor Analysis, Rank Tracking, AEO/GEO Checks, Client Reports, and Agent Chat.
+- **Pricing (`/pricing`)**: Monthly and annual pricing tiers for Freelancer ($49/mo), Agency ($149/mo), and Team ($299/mo).
+- **Privacy Policy (`/privacy`)**: Read-only safe data architecture and multi-tenant security guarantees.
+- **Terms of Service (`/terms`)**: Service level agreements, fair-use crawl policies, and licensing.
+
+## Key Capabilities & Technical Facts
+1. **SSRF-Safe Crawler**: Internal crawler that scans up to 500 pages per audit run, blocking private IP ranges, loopbacks, and metadata endpoints.
+2. **Deterministic Health Scoring**: Transparent point deductions for critical, high, and medium technical defects. No hallucinated metrics.
+3. **AEO & GEO Readiness**: Evaluates Schema.org graphs (FAQPage, Article, Organization, HowTo) and direct 40-60 word answer formats for citation by ChatGPT, Perplexity, Claude, and Google AI Overviews.
+4. **Google Search Console Integration**: Read-only OAuth 2.0 connection extracting impressions, CTR, and search queries with zero third-party data sharing.
+5. **Re-Crawl Verification Engine**: Automatically re-audits affected URLs after task completion to verify that technical fixes were correctly implemented in live HTML.
+6. **Executive Client Reporting**: 1-click white-label PDF report generation for agencies showcasing verified improvements.
+
+## Pricing Tiers (USD)
+- **Freelancer**: $49/month ($39/mo billed annually). Up to 3 websites, 25 crawled pages/audit.
+- **Agency (Most Popular)**: $149/month ($119/mo billed annually). Up to 15 websites, 100 crawled pages/audit, white-label reports, automated re-crawl verification.
+- **Team**: $299/month ($239/mo billed annually). Up to 50 websites, 500 crawled pages/audit, custom webhooks, dedicated support.
+
+## Company & Support
+- **Support Contact**: support@rankpilot.ai
+- **Location & Background**: [ADD REAL INFO: Company headquarters and founder info]
+- **Documentation**: https://rankpilot.ai/how-it-works

@@ -547,8 +547,40 @@ export default function ActionCenterPage() {
                 )}
               </div>
 
+              {/* Beginner Prompt Chips */}
+              <div className="pt-2 border-t border-border flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setChatInput('Find top striking distance keyword opportunities')}
+                  className="px-2 py-1 rounded-sm bg-bg border border-border text-[10px] text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Striking distance queries
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatInput('Check missing Schema.org JSON-LD code')}
+                  className="px-2 py-1 rounded-sm bg-bg border border-border text-[10px] text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Generate Schema code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatInput('Diagnose recent organic traffic changes')}
+                  className="px-2 py-1 rounded-sm bg-bg border border-border text-[10px] text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Analyze traffic drop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatInput('Draft client report executive summary')}
+                  className="px-2 py-1 rounded-sm bg-bg border border-border text-[10px] text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Draft report summary
+                </button>
+              </div>
+
               {/* Chat Input */}
-              <form onSubmit={handleSendMessage} className="pt-2 border-t border-border flex items-center gap-2">
+              <form onSubmit={handleSendMessage} className="pt-1 flex items-center gap-2">
                 <input
                   type="text"
                   placeholder="Ask agent to diagnose or craft fixes..."
