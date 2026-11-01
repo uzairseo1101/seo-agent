@@ -17,10 +17,12 @@ export interface GeoAnalysisResult {
 export function analyzeGeoSignals(
   pages: CrawledPageData[],
   websiteId: string,
-  auditRunId: string
+  auditRunId: string,
+  websiteUrl: string = 'https://example.com'
 ): GeoAnalysisResult {
   const findings: AuditFinding[] = [];
   let scorePoints = 100;
+  const fallbackUrl = pages[0]?.url || websiteUrl;
 
   // 1. Organization Schema check
   const allSchemas = pages.flatMap(p => p.schemas);
@@ -36,7 +38,7 @@ export function analyzeGeoSignals(
       id: `fnd-geo-org-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'geo',
       issueType: 'missing_organization_schema',
       severity: 'high',
@@ -136,7 +138,7 @@ export function analyzeGeoSignals(
       id: `fnd-geo-cit-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'geo',
       issueType: 'low_source_transparency',
       severity: 'medium',
@@ -165,7 +167,7 @@ export function analyzeGeoSignals(
       id: `fnd-geo-abt-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'geo',
       issueType: 'missing_about_or_contact_signals',
       severity: 'medium',

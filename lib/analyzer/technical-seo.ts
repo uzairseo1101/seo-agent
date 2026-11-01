@@ -4,10 +4,12 @@ import { AuditFinding, FindingSeverity } from '../types';
 export function analyzeTechnicalSeo(
   crawlResult: CrawlResult,
   websiteId: string,
-  auditRunId: string
+  auditRunId: string,
+  websiteUrl: string = 'https://example.com'
 ): AuditFinding[] {
   const findings: AuditFinding[] = [];
   const { pages, robotsTxt, sitemap } = crawlResult;
+  const fallbackUrl = pages[0]?.url || websiteUrl;
 
   // Track titles for duplicate detection
   const titleMap = new Map<string, string[]>();
@@ -18,7 +20,7 @@ export function analyzeTechnicalSeo(
       id: `fnd-rob-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'technical',
       issueType: 'robots_txt_inaccessible',
       severity: 'high',
@@ -42,7 +44,7 @@ export function analyzeTechnicalSeo(
       id: `fnd-smp-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'indexability',
       issueType: 'sitemap_inaccessible',
       severity: 'medium',

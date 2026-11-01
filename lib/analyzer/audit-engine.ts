@@ -29,13 +29,13 @@ export async function executeWebsiteAudit(
   const crawlResult = await crawlWebsite(website.url, options);
 
   // 2. Technical SEO evaluation
-  const technicalFindings = analyzeTechnicalSeo(crawlResult, websiteId, auditRunId);
+  const technicalFindings = analyzeTechnicalSeo(crawlResult, websiteId, auditRunId, website.url);
 
   // 3. GEO signals evaluation
-  const geoResult = analyzeGeoSignals(crawlResult.pages, websiteId, auditRunId);
+  const geoResult = analyzeGeoSignals(crawlResult.pages, websiteId, auditRunId, website.url);
 
   // 4. AEO signals evaluation
-  const aeoResult = analyzeAeoSignals(crawlResult.pages, websiteId, auditRunId);
+  const aeoResult = analyzeAeoSignals(crawlResult.pages, websiteId, auditRunId, website.url);
 
   // 5. Aggregate all findings
   const allFindings = [

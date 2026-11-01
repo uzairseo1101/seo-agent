@@ -17,10 +17,12 @@ const QUESTION_REGEX = /^(what|how|why|when|where|who|which|can|is|are|do|does|w
 export function analyzeAeoSignals(
   pages: CrawledPageData[],
   websiteId: string,
-  auditRunId: string
+  auditRunId: string,
+  websiteUrl: string = 'https://example.com'
 ): AeoAnalysisResult {
   const findings: AuditFinding[] = [];
   let scorePoints = 100;
+  const fallbackUrl = pages[0]?.url || websiteUrl;
 
   // 1. Question-based Headings Check
   let totalQuestionHeadings = 0;
@@ -41,7 +43,7 @@ export function analyzeAeoSignals(
       id: `fnd-aeo-qhd-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'aeo',
       issueType: 'missing_question_based_headings',
       severity: 'medium',
@@ -71,7 +73,7 @@ export function analyzeAeoSignals(
       id: `fnd-aeo-faq-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages.find(p => p.url.includes('/faq'))?.url || pages[0]?.url || 'root',
+      url: pages.find(p => p.url.includes('/faq'))?.url || fallbackUrl,
       category: 'aeo',
       issueType: 'missing_faq_schema',
       severity: 'high',
@@ -93,7 +95,7 @@ export function analyzeAeoSignals(
       id: `fnd-aeo-no-faq-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'aeo',
       issueType: 'no_faq_markup_opportunity',
       severity: 'low',
@@ -127,7 +129,7 @@ export function analyzeAeoSignals(
       id: `fnd-aeo-ans-${Date.now()}`,
       auditRunId,
       websiteId,
-      url: pages[0]?.url || 'root',
+      url: fallbackUrl,
       category: 'aeo',
       issueType: 'answer_density_low',
       severity: 'medium',
