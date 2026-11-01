@@ -1,28 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #F8FAFC;
-  --foreground: #0F172A;
+  --bg: #F8FAFC;
   --card: #FFFFFF;
-  --card-foreground: #0F172A;
   --border: #E2E8F0;
-  --primary: #4F46E5;
-  --primary-foreground: #FFFFFF;
-  --secondary: #6366F1;
+  --primary: #059669;
+  --primary-hover: #047857;
+  --primary-tint: #ECFDF5;
+  --accent: #2563EB;
+  --accent-tint: #EFF6FF;
+  --text: #0F172A;
   --muted: #64748B;
-  --navy: #172554;
+  --success: #16A34A;
+  --warning: #F59E0B;
+  --error: #DC2626;
+  --font-head: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 1px 2px rgba(15,23,42,.04), 0 4px 12px rgba(15,23,42,.05);
+  --shadow-pop: 0 8px 24px rgba(15,23,42,.12);
+}
+
+.dark {
+  --bg: #0B1220;
+  --card: #111A2C;
+  --border: #1F2A3F;
+  --text: #E2E8F0;
+  --muted: #94A3B8;
+  --primary: #10B981;
+  --primary-hover: #059669;
+  --primary-tint: rgba(16, 185, 129, 0.15);
+  --accent: #60A5FA;
+  --accent-tint: rgba(96, 165, 250, 0.15);
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.3);
+  --shadow-pop: 0 8px 28px rgba(0,0,0,.5);
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-head);
+}
+
+/* Tabular numbers for all metrics, stats and data tables */
+.tnum, table, [data-tabular] {
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -36,4 +82,10 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }

@@ -1,6 +1,8 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export default function HowItWorksPage() {
   const steps = [
@@ -47,37 +49,37 @@ export default function HowItWorksPage() {
   ];
 
   return (
-    <div className="py-16 sm:py-24 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-      <div className="text-center space-y-4">
-        <span className="text-xs font-bold uppercase tracking-wider text-brand-600">The 8-Step Operational Engine</span>
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-navy tracking-tight">
-          How RankPilot AI Powers Agency SEO Operations
+    <div className="py-16 sm:py-24 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+      <div className="text-center space-y-3 max-w-2xl mx-auto">
+        <span className="text-xs font-mono font-medium text-primary uppercase tracking-wider">The 8-Step Operational Engine</span>
+        <h1 className="text-3xl sm:text-[48px] font-bold font-head text-text tracking-tight leading-[1.15]">
+          How RankPilot AI Powers Agency SEO
         </h1>
-        <p className="max-w-2xl mx-auto text-sm sm:text-base text-surface-muted leading-relaxed">
+        <p className="text-base text-muted leading-relaxed">
           From the initial crawl to verified production fixes and client reports: a systematic, evidence-backed workflow designed to replace spreadsheets.
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 max-w-4xl mx-auto">
         {steps.map((step) => (
-          <div key={step.num} className="bg-white p-6 sm:p-8 rounded-2xl border border-surface-border shadow-sm flex flex-col sm:flex-row items-start gap-6">
-            <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-brand-600 font-extrabold text-base shrink-0">
+          <div key={step.num} className="bg-card p-6 rounded-lg border border-border shadow-card flex flex-col sm:flex-row items-start gap-5">
+            <div className="w-10 h-10 rounded-md bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary font-mono font-bold text-sm shrink-0">
               {step.num}
             </div>
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-navy tracking-wide">{step.title}</h3>
-              <p className="text-xs sm:text-sm text-surface-muted leading-relaxed">{step.desc}</p>
+              <h3 className="text-base font-bold font-head text-text tracking-wide">{step.title}</h3>
+              <p className="text-sm text-muted leading-relaxed">{step.desc}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="text-center pt-8">
+      <div className="text-center pt-4">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-md transition-all"
+          className="inline-flex items-center gap-2 px-6 h-10 rounded-md bg-primary hover:bg-primary-hover text-white font-medium text-sm shadow-xs transition-colors"
         >
-          Try the Workflow in Agency Dashboard
+          <span>Try Workflow in Agency Dashboard</span>
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>

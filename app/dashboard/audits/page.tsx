@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
 import { AuditRun, AuditFinding, FindingCategory, FindingSeverity } from '@/lib/types';
@@ -18,7 +19,11 @@ import {
   ExternalLink,
   Info,
   Clock,
-  Sparkles
+  Sparkles,
+  Bot,
+  RefreshCw,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 
 export default function AuditsPage() {
@@ -30,7 +35,6 @@ export default function AuditsPage() {
   // Filter state
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
-  const [selectedFinding, setSelectedFinding] = useState<AuditFinding | null>(null);
 
   // Trigger Modal & Progress state
   const [isTriggerModalOpen, setIsTriggerModalOpen] = useState(false);
@@ -50,7 +54,6 @@ export default function AuditsPage() {
     setAuditProgressStep('Validating URL against anti-SSRF boundaries...');
 
     try {
-      // Simulate real-time steps for user feedback
       setTimeout(() => setAuditProgressStep('Fetching robots.txt and sitemap.xml...'), 400);
       setTimeout(() => setAuditProgressStep('Executing controlled sample crawl (Cheerio)...'), 900);
       setTimeout(() => setAuditProgressStep('Running 30+ Technical SEO checks...'), 1400);
@@ -72,7 +75,6 @@ export default function AuditsPage() {
         throw new Error(data.error || 'Audit execution failed.');
       }
 
-      // Update state with newly saved audit run and findings
       setAuditRuns([...storage.getAuditRuns()]);
       setFindings([...storage.getFindings()]);
       setIsTriggerModalOpen(false);
@@ -86,7 +88,7 @@ export default function AuditsPage() {
   const handleCreateTask = (findingId: string) => {
     const newTask = storage.createActionItemFromFinding(findingId);
     if (newTask) {
-      setTaskAddedNotice(`Task created: "${newTask.title}"`);
+      setTaskAddedNotice(`Action Task created: "${newTask.title}"`);
       setTimeout(() => setTaskAddedNotice(null), 3500);
     }
   };
@@ -98,25 +100,34 @@ export default function AuditsPage() {
   });
 
   return (
-    <div>
+    <div className="space-y-6">
       <DashboardHeader
         title="SEO, GEO & AEO Website Audits"
         subtitle="Safe in-house crawls evaluating 30+ technical standards, entity clarity and answer engine readiness"
+        actionButton={
+          <button
+            onClick={() => setIsTriggerModalOpen(true)}
+            className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-primary hover:bg-primary-hover text-white text-xs font-medium shadow-xs transition-colors"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            <span>Launch Audit</span>
+          </button>
+        }
       />
 
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Banner with Launch Audit CTA */}
-        <div className="bg-white rounded-xl border border-surface-border p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Banner with Target Domain Info */}
+        <div className="bg-card rounded-lg border border-border p-5 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-brand-600">
+            <div className="w-10 h-10 rounded-md bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary">
               <FileSearch className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-navy">Target Domain: {selectedWebsite?.name}</h3>
-                <span className="text-[11px] font-mono text-surface-muted">({selectedWebsite?.domain})</span>
+                <h3 className="text-sm font-bold font-head text-text">Target: {selectedWebsite?.name}</h3>
+                <span className="text-[11px] font-mono text-muted">({selectedWebsite?.domain})</span>
               </div>
-              <p className="text-xs text-surface-muted mt-0.5">
+              <p className="text-xs text-muted mt-0.5">
                 Safe lightweight crawler with DNS validation, private IP blocking, and robots.txt compliance.
               </p>
             </div>
@@ -124,67 +135,73 @@ export default function AuditsPage() {
 
           <button
             onClick={() => setIsTriggerModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 h-10 px-4 border border-border bg-card hover:bg-slate-50 text-text rounded-md text-xs font-medium shadow-xs transition-colors"
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Launch Audit</span>
+            <RefreshCw className="w-3.5 h-3.5 text-muted" />
+            <span>Configure Crawl</span>
           </button>
         </div>
 
         {/* Task Added Notification Banner */}
         {taskAddedNotice && (
-          <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between shadow-xs animate-in fade-in">
+          <div className="p-3.5 rounded-md bg-primary-tint border border-emerald-200 text-xs text-text flex items-center justify-between shadow-xs animate-in fade-in">
             <div className="flex items-center gap-2">
-              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <Check className="w-4 h-4 text-primary shrink-0" />
               <span>{taskAddedNotice}</span>
             </div>
-            <a href="/dashboard/action-center" className="font-semibold text-emerald-900 underline hover:no-underline">
+            <Link href="/dashboard/action-center" className="font-medium text-accent hover:underline">
               View in Action Center →
-            </a>
+            </Link>
           </div>
         )}
 
         {/* Score Cards Row */}
         {latestRun && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-surface-border shadow-sm">
-              <div className="flex items-center justify-between text-xs font-semibold text-surface-muted">
+            <div className="bg-card p-5 rounded-lg border border-border shadow-card">
+              <div className="flex items-center justify-between text-xs font-medium text-muted">
                 <span>Technical SEO Score</span>
-                <span className="text-[11px] text-emerald-600 font-bold">Standard Formula</span>
+                <span className="text-[11px] font-mono text-primary bg-primary-tint border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                  Formula
+                </span>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-navy">{latestRun.seoScore}</span>
-                <span className="text-xs text-surface-muted">/ 100</span>
+                <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">{latestRun.seoScore}</span>
+                <span className="text-xs font-mono text-muted">/ 100</span>
               </div>
-              <p className="mt-1 text-[11px] text-surface-muted">
+              <p className="mt-2 text-xs text-muted">
                 Technical (45%) + Indexability (30%) + Content (25%)
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-surface-border shadow-sm">
-              <div className="flex items-center justify-between text-xs font-semibold text-surface-muted">
+            <div className="bg-card p-5 rounded-lg border border-border shadow-card">
+              <div className="flex items-center justify-between text-xs font-medium text-muted">
                 <span>GEO Visibility Score</span>
-                <span className="text-[11px] text-brand-600 font-bold">Proprietary</span>
+                <span className="text-[11px] font-mono text-accent bg-accent-tint border border-blue-200/60 px-2 py-0.5 rounded-full">
+                  Entity Graph
+                </span>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-navy">{latestRun.geoScore}</span>
-                <span className="text-xs text-surface-muted">/ 100</span>
+                <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">{latestRun.geoScore}</span>
+                <span className="text-xs font-mono text-muted">/ 100</span>
               </div>
-              <p className="mt-1 text-[11px] text-surface-muted">
+              <p className="mt-2 text-xs text-muted">
                 Brand entity clarity & author citation authority
               </p>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-surface-border shadow-sm">
-              <div className="flex items-center justify-between text-xs font-semibold text-surface-muted">
+            <div className="bg-card p-5 rounded-lg border border-border shadow-card">
+              <div className="flex items-center justify-between text-xs font-medium text-muted">
                 <span>AEO Direct Answer Score</span>
-                <span className="text-[11px] text-brand-600 font-bold">Proprietary</span>
+                <span className="text-[11px] font-mono text-accent bg-accent-tint border border-blue-200/60 px-2 py-0.5 rounded-full">
+                  Readiness
+                </span>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-extrabold text-navy">{latestRun.aeoScore}</span>
-                <span className="text-xs text-surface-muted">/ 100</span>
+                <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">{latestRun.aeoScore}</span>
+                <span className="text-xs font-mono text-muted">/ 100</span>
               </div>
-              <p className="mt-1 text-[11px] text-surface-muted">
+              <p className="mt-2 text-xs text-muted">
                 Q&A structure & direct answer summary coverage
               </p>
             </div>
@@ -192,14 +209,14 @@ export default function AuditsPage() {
         )}
 
         {/* Findings Filter Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-surface-border shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-4 rounded-lg border border-border shadow-card">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-surface-muted">Category:</span>
+              <span className="text-xs font-medium text-muted">Category:</span>
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-surface-border bg-surface-bg outline-none"
+                className="text-xs font-medium px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs cursor-pointer"
               >
                 <option value="all">All Categories ({findings.length})</option>
                 <option value="technical">Technical</option>
@@ -211,15 +228,15 @@ export default function AuditsPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-surface-muted">Severity:</span>
+              <span className="text-xs font-medium text-muted">Severity:</span>
               <select
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
-                className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-surface-border bg-surface-bg outline-none"
+                className="text-xs font-medium px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs cursor-pointer"
               >
                 <option value="all">All Severities</option>
                 <option value="critical">Critical</option>
-                <option value="high">High</option>
+                <option value="high">High / Warning</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
                 <option value="info">Info</option>
@@ -227,110 +244,118 @@ export default function AuditsPage() {
             </div>
           </div>
 
-          <div className="text-xs text-surface-muted">
-            Displaying <strong className="text-navy">{filteredFindings.length}</strong> findings
+          <div className="text-xs text-muted font-mono">
+            Displaying <strong className="text-text">{filteredFindings.length}</strong> findings
           </div>
         </div>
 
-        {/* Findings List with Evidence Drawer */}
-        <div className="bg-white rounded-xl border border-surface-border shadow-sm overflow-hidden divide-y divide-surface-border">
+        {/* Findings Result Cards */}
+        <div className="bg-card rounded-lg border border-border shadow-card overflow-hidden divide-y divide-border">
           {filteredFindings.map((finding) => (
-            <div key={finding.id} className="p-5 hover:bg-slate-50/70 transition-colors space-y-3">
+            <div key={finding.id} className="p-6 hover:bg-bg transition-colors space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                    finding.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                    finding.severity === 'high' ? 'bg-amber-100 text-amber-700' :
-                    finding.severity === 'medium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'
+                  <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                    finding.severity === 'critical' ? 'bg-red-50 text-error border border-red-200' :
+                    finding.severity === 'high' ? 'bg-amber-50 text-warning border border-amber-200' :
+                    'bg-emerald-50 text-primary border border-emerald-200'
                   }`}>
-                    {finding.severity}
+                    {finding.severity === 'critical' ? 'Critical' : finding.severity === 'high' ? 'Warning' : 'Good'}
                   </span>
-                  <span className="text-xs font-bold text-surface-muted uppercase">{finding.category}</span>
-                  <span className="text-xs text-slate-300">•</span>
-                  <span className="text-xs text-surface-muted">
-                    Confidence: <strong className="text-navy">{finding.confidenceLevel}</strong>
+                  <span className="text-xs font-mono font-medium text-muted uppercase tracking-wider">{finding.category}</span>
+                  <span className="text-xs text-border">•</span>
+                  <span className="text-xs text-muted">
+                    Confidence: <strong className="text-text font-mono">{finding.confidenceLevel}</strong>
                   </span>
                 </div>
 
-                <button
-                  onClick={() => handleCreateTask(finding.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-brand-700 text-xs font-semibold transition-colors self-start sm:self-auto"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-brand-600" />
-                  <span>Create Action Task</span>
-                </button>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <Link
+                    href="/dashboard/action-center"
+                    className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md border border-border bg-card hover:bg-slate-50 text-accent text-xs font-medium shadow-xs transition-colors"
+                  >
+                    <Bot className="w-3.5 h-3.5 text-accent" />
+                    <span>Fix with agent</span>
+                  </Link>
+
+                  <button
+                    onClick={() => handleCreateTask(finding.id)}
+                    className="inline-flex items-center gap-1.5 px-3 h-8 rounded-md border border-border bg-card hover:bg-slate-50 text-text text-xs font-medium shadow-xs transition-colors"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+                    <span>Create Task</span>
+                  </button>
+                </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-bold text-navy">{finding.title}</h4>
-                <p className="text-xs text-surface-muted mt-0.5">{finding.description}</p>
-                <p className="text-xs font-mono text-slate-500 mt-1 truncate">
-                  Affected URL: {finding.url}
+                <h4 className="text-sm font-bold font-head text-text">{finding.title}</h4>
+                <p className="text-xs text-muted mt-0.5 leading-relaxed">{finding.description}</p>
+                <p className="text-xs font-mono text-muted mt-1 truncate">
+                  Target: {finding.url}
                 </p>
               </div>
 
               {/* Evidence & Snippet Box */}
-              <div className="p-3.5 rounded-lg bg-surface-bg border border-surface-border text-xs space-y-1.5">
-                <div className="text-slate-700">
-                  <strong className="text-navy">Detection Method:</strong> {finding.detectionMethod}
+              <div className="p-3.5 rounded-md bg-bg border border-border text-xs space-y-1.5">
+                <div className="text-text">
+                  <strong className="text-text">Detection Method:</strong> {finding.detectionMethod}
                 </div>
-                <div className="text-slate-700">
-                  <strong className="text-navy">Expected:</strong> {finding.evidence.expected}
+                <div className="text-text">
+                  <strong className="text-text">Expected:</strong> {finding.evidence.expected}
                 </div>
-                <div className="text-slate-700">
-                  <strong className="text-navy">Actual Evidence:</strong> {finding.evidence.actual}
+                <div className="text-text">
+                  <strong className="text-text">Actual Evidence:</strong> {finding.evidence.actual}
                 </div>
                 {finding.evidence.snippet && (
-                  <div className="mt-2 font-mono text-[11px] bg-white p-2.5 rounded border border-slate-200 text-slate-700 overflow-x-auto">
+                  <div className="mt-2 font-mono text-[11px] bg-card p-2.5 rounded-md border border-border text-text overflow-x-auto">
                     {finding.evidence.snippet}
                   </div>
                 )}
               </div>
 
               {/* Recommendation row */}
-              <div className="pt-1 text-xs text-brand-800 font-medium">
-                <strong>Recommended Action:</strong> {finding.recommendation}
+              <div className="pt-1 text-xs text-text font-medium flex items-center gap-1.5">
+                <span className="text-primary font-bold">Recommended Action:</span>
+                <span className="text-muted">{finding.recommendation}</span>
               </div>
             </div>
           ))}
 
           {filteredFindings.length === 0 && (
-            <div className="text-center py-12">
-              <FileSearch className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs font-semibold text-navy">No findings match the selected filters.</p>
+            <div className="text-center py-16 space-y-3">
+              <FileSearch className="w-10 h-10 text-muted mx-auto" />
+              <p className="text-sm font-medium text-text">No findings match the selected filters.</p>
+              <button
+                onClick={() => { setCategoryFilter('all'); setSeverityFilter('all'); }}
+                className="px-4 h-10 rounded-md border border-border bg-card hover:bg-slate-50 text-text font-medium text-xs shadow-xs"
+              >
+                Reset Filters
+              </button>
             </div>
           )}
         </div>
 
-        {/* Recent Audit Runs History */}
-        <div className="bg-white rounded-xl border border-surface-border shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-surface-border">
-            <h3 className="text-sm font-bold text-navy">Audit History ({auditRuns.length})</h3>
+        {/* Recent Audit Runs History (48px table rows) */}
+        <div className="bg-card rounded-lg border border-border shadow-card overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <h3 className="text-sm font-bold font-head text-text">Audit History ({auditRuns.length})</h3>
           </div>
-          <div className="divide-y divide-surface-border">
+          <div className="divide-y divide-border">
             {auditRuns.map((run) => (
-              <div key={run.id} className="p-4 flex items-center justify-between text-xs hover:bg-slate-50">
-                <div>
-                  <span className="font-bold text-navy">
-                    {new Date(run.startedAt).toLocaleString()}
+              <div key={run.id} className="h-12 px-4 flex items-center justify-between text-xs hover:bg-bg transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-medium text-text">
+                    {new Date(run.startedAt).toLocaleDateString()}
                   </span>
-                  <p className="text-surface-muted mt-0.5">
-                    Crawled {run.pagesCrawled} sample pages in {(run.crawlDurationMs / 1000).toFixed(1)}s
-                  </p>
+                  <span className="text-muted font-mono text-[11px]">
+                    {run.pagesCrawled} pages in {(run.crawlDurationMs / 1000).toFixed(1)}s
+                  </span>
                 </div>
-                <div className="flex items-center gap-4 text-right">
-                  <div>
-                    <span className="font-bold text-navy">{run.seoScore}</span>
-                    <span className="text-[10px] text-surface-muted block">SEO</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-navy">{run.geoScore}</span>
-                    <span className="text-[10px] text-surface-muted block">GEO</span>
-                  </div>
-                  <div>
-                    <span className="font-bold text-navy">{run.aeoScore}</span>
-                    <span className="text-[10px] text-surface-muted block">AEO</span>
-                  </div>
+                <div className="flex items-center gap-4 font-mono">
+                  <span className="font-bold text-text tnum">{run.seoScore} <span className="text-[10px] text-muted font-normal">SEO</span></span>
+                  <span className="font-bold text-text tnum">{run.geoScore} <span className="text-[10px] text-muted font-normal">GEO</span></span>
+                  <span className="font-bold text-text tnum">{run.aeoScore} <span className="text-[10px] text-muted font-normal">AEO</span></span>
                 </div>
               </div>
             ))}
@@ -340,34 +365,49 @@ export default function AuditsPage() {
 
       {/* Trigger Audit Modal */}
       {isTriggerModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-surface-border max-w-md w-full p-6 shadow-xl animate-in fade-in zoom-in-95 space-y-4">
-            <h3 className="text-base font-bold text-navy">Launch Safe Website Audit</h3>
-            <p className="text-xs text-surface-muted">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card rounded-lg border border-border max-w-md w-full p-6 shadow-pop animate-in fade-in space-y-4">
+            <h3 className="text-base font-bold font-head text-text">Launch Safe Website Audit</h3>
+            <p className="text-xs text-muted">
               Select monitored website to initiate controlled in-house crawl and multi-factor evaluation.
             </p>
 
             {auditError && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-xs text-error flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>{auditError}</span>
               </div>
             )}
 
             {isAuditing ? (
-              <div className="py-6 text-center space-y-3">
-                <div className="w-10 h-10 border-3 border-brand-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="text-xs font-bold text-navy">Audit in Progress...</p>
-                <p className="text-xs text-surface-muted animate-pulse">{auditProgressStep}</p>
+              <div className="py-6 space-y-4">
+                {/* Vertical Step Timeline for Active Crawl */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <CheckCircle className="w-4 h-4 text-primary shrink-0" />
+                    <span className="font-sans text-text">Anti-SSRF boundary validation</span>
+                    <span className="font-mono text-[10px] text-muted ml-auto">12ms</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <RefreshCw className="w-4 h-4 text-accent animate-spin shrink-0" />
+                    <span className="font-sans text-text">{auditProgressStep}</span>
+                    <span className="font-mono text-[10px] text-accent ml-auto">active</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted opacity-60">
+                    <span className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-600 inline-block shrink-0" />
+                    <span className="font-sans">GEO & AEO scoring</span>
+                    <span className="font-mono text-[10px] ml-auto">queued</span>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-navy block mb-1">Monitored Website</label>
+                  <label className="text-xs font-semibold text-text block mb-1">Monitored Website</label>
                   <select
                     value={selectedWebsiteId}
                     onChange={(e) => setSelectedWebsiteId(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-surface-border bg-white outline-none"
+                    className="w-full text-xs px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs"
                   >
                     {websites.map((w) => (
                       <option key={w.id} value={w.id}>
@@ -377,13 +417,13 @@ export default function AuditsPage() {
                   </select>
                 </div>
 
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
-                  <div className="flex items-center gap-1.5 font-semibold text-navy">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <div className="p-3 rounded-md bg-bg border border-border text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold text-text">
+                    <ShieldCheck className="w-4 h-4 text-primary" />
                     <span>Safe Crawl Configuration:</span>
                   </div>
-                  <p className="text-surface-muted pl-5">
-                    Sample limit: 15 pages • Max depth: 1 • Rate limit: 400ms delay • Anti-SSRF DNS verification active.
+                  <p className="text-muted pl-5 font-mono text-[11px]">
+                    Sample limit: 15 pages • Max depth: 1 • Rate limit: 400ms delay • Anti-SSRF active.
                   </p>
                 </div>
 
@@ -391,14 +431,14 @@ export default function AuditsPage() {
                   <button
                     type="button"
                     onClick={() => setIsTriggerModalOpen(false)}
-                    className="px-4 py-2 text-xs font-semibold text-surface-muted hover:text-navy rounded-lg"
+                    className="px-4 h-10 text-xs font-medium text-muted hover:text-text rounded-md"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleLaunchAudit}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm"
+                    className="px-4 h-10 text-xs font-medium text-white bg-primary hover:bg-primary-hover rounded-md shadow-xs transition-colors"
                   >
                     Start Crawl & Audit
                   </button>

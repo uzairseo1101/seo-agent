@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "RankPilot AI — AI-Powered SEO Intelligence & Action Management SaaS",
+    default: "RankPilot AI — Clean Rank SEO Intelligence & Action SaaS",
     template: "%s | RankPilot AI",
   },
   description: "Connect your website. Discover SEO, GEO and AEO opportunities. Get prioritized actions, monitor performance and verify improvements with AI-powered intelligence.",
@@ -26,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-surface-bg text-surface-text antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen bg-bg text-text font-sans antialiased selection:bg-primary-tint selection:text-primary">
         {children}
       </body>
     </html>

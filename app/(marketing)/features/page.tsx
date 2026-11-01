@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import {
@@ -71,31 +73,32 @@ export default function FeaturesPage() {
   ];
 
   return (
-    <div className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-      <div className="text-center max-w-3xl mx-auto space-y-4">
-        <span className="text-xs font-bold uppercase tracking-wider text-brand-600">Platform Capabilities</span>
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-navy tracking-tight">
-          Every tool your agency needs to turn SEO findings into verified results
+    <div className="py-16 sm:py-24 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+      <div className="text-center max-w-3xl mx-auto space-y-3">
+        <span className="text-xs font-mono font-medium text-primary uppercase tracking-wider">Platform Capabilities</span>
+        <h1 className="text-3xl sm:text-[48px] font-bold font-head text-text tracking-tight leading-[1.15]">
+          Tools to Turn SEO Findings into Verified Results
         </h1>
-        <p className="text-sm sm:text-base text-surface-muted leading-relaxed">
+        <p className="text-base text-muted leading-relaxed">
           Explore the modular architecture of RankPilot AI designed specifically for digital marketing teams managing multiple client websites.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {featureList.map((f) => {
           const Icon = f.icon;
           return (
-            <div key={f.title} className="bg-white p-7 rounded-2xl border border-surface-border shadow-sm flex flex-col justify-between space-y-4">
+            <div key={f.title} className="bg-card p-6 rounded-lg border border-border shadow-card flex flex-col justify-between space-y-4 hover:-translate-y-0.5 transition-transform duration-200">
               <div>
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-brand-600 mb-4">
+                <div className="w-10 h-10 rounded-md bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary mb-4">
                   <Icon className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-bold text-navy">{f.title}</h3>
-                <p className="text-xs text-surface-muted leading-relaxed mt-2">{f.desc}</p>
+                <h3 className="text-base font-bold font-head text-text">{f.title}</h3>
+                <p className="text-xs text-muted leading-relaxed mt-2">{f.desc}</p>
               </div>
-              <Link href={f.href} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 pt-2">
-                Learn more <ArrowRight className="w-3.5 h-3.5" />
+              <Link href={f.href} className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline pt-2">
+                <span>Learn more</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           );

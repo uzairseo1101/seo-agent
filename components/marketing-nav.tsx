@@ -8,33 +8,37 @@ export default function MarketingNav() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-surface-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b border-border transition-colors">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-navy flex items-center justify-center text-white shadow-sm">
-              <Compass className="w-5 h-5 text-indigo-400" />
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white shadow-xs">
+              <Compass className="w-4.5 h-4.5" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-lg text-navy tracking-tight leading-none">RankPilot <span className="text-brand-600">AI</span></span>
-              <span className="text-[10px] text-surface-muted font-medium tracking-wider uppercase mt-0.5">SEO & Action Platform</span>
+              <span className="font-head font-bold text-lg text-text tracking-tight leading-none">
+                RankPilot <span className="text-primary font-semibold">AI</span>
+              </span>
+              <span className="text-[10px] text-muted font-medium tracking-wider uppercase mt-0.5">
+                SEO & Action Platform
+              </span>
             </div>
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-surface-muted">
-            <Link href="/features" className="hover:text-navy transition-colors">Features</Link>
-            <Link href="/how-it-works" className="hover:text-navy transition-colors">How It Works</Link>
-            <Link href="/seo-website-audit" className="hover:text-navy transition-colors">Audit</Link>
-            <Link href="/geo-optimization" className="hover:text-navy transition-colors">GEO</Link>
-            <Link href="/aeo-optimization" className="hover:text-navy transition-colors">AEO</Link>
-            <Link href="/gsc-intelligence" className="hover:text-navy transition-colors">GSC</Link>
-            <Link href="/action-management" className="hover:text-navy transition-colors">Action Center</Link>
-            <Link href="/pricing" className="hover:text-navy transition-colors">Pricing</Link>
-            <Link href="/trust-and-methodology" className="flex items-center gap-1 text-brand-600 hover:text-brand-700 font-semibold transition-colors">
+          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-muted">
+            <Link href="/features" className="hover:text-text transition-colors">Features</Link>
+            <Link href="/how-it-works" className="hover:text-text transition-colors">How It Works</Link>
+            <Link href="/seo-website-audit" className="hover:text-text transition-colors">Audits</Link>
+            <Link href="/geo-optimization" className="hover:text-text transition-colors">GEO</Link>
+            <Link href="/aeo-optimization" className="hover:text-text transition-colors">AEO</Link>
+            <Link href="/gsc-intelligence" className="hover:text-text transition-colors">GSC</Link>
+            <Link href="/action-management" className="hover:text-text transition-colors">Tasks</Link>
+            <Link href="/pricing" className="hover:text-text transition-colors">Pricing</Link>
+            <Link href="/trust-and-methodology" className="flex items-center gap-1 text-accent hover:text-accent/80 font-medium transition-colors">
               <ShieldCheck className="w-3.5 h-3.5" />
-              Trust
+              <span>Trust</span>
             </Link>
           </nav>
 
@@ -42,16 +46,16 @@ export default function MarketingNav() {
           <div className="hidden sm:flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm font-medium text-surface-muted hover:text-navy px-3.5 py-2 rounded-lg transition-colors"
+              className="text-sm font-medium text-muted hover:text-text px-3.5 h-10 inline-flex items-center justify-center rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             >
-              Log in
+              Sign In
             </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 px-4 py-2 rounded-lg shadow-sm transition-all hover:shadow"
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-white bg-primary hover:bg-primary-hover px-4 h-10 rounded-md shadow-xs transition-colors"
             >
-              Open Dashboard
-              <ArrowRight className="w-4 h-4" />
+              <span>Get Started</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
@@ -59,10 +63,10 @@ export default function MarketingNav() {
           <div className="flex lg:hidden">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-surface-muted hover:text-navy hover:bg-slate-100"
+              className="p-2 rounded-md text-muted hover:text-text hover:bg-slate-100"
               aria-label="Toggle menu"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -70,25 +74,22 @@ export default function MarketingNav() {
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-surface-border bg-white px-4 pt-3 pb-6 space-y-3">
-          <Link href="/features" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">Features</Link>
-          <Link href="/how-it-works" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">How It Works</Link>
-          <Link href="/seo-website-audit" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">SEO Website Audit</Link>
-          <Link href="/geo-optimization" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">GEO Optimization</Link>
-          <Link href="/aeo-optimization" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">AEO Optimization</Link>
-          <Link href="/gsc-intelligence" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">GSC Intelligence</Link>
-          <Link href="/seo-opportunity-finder" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">SEO Opportunity Finder</Link>
-          <Link href="/traffic-drop-analysis" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">Traffic Drop Analysis</Link>
-          <Link href="/action-management" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">SEO Action Management</Link>
-          <Link href="/agency-reporting" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">Agency Reporting</Link>
-          <Link href="/pricing" className="block text-sm font-medium py-2 text-surface-text hover:text-brand-600">Pricing</Link>
-          <Link href="/trust-and-methodology" className="block text-sm font-medium py-2 text-brand-600">Trust and Methodology</Link>
-          <div className="pt-4 border-t border-surface-border flex flex-col gap-2">
-            <Link href="/login" className="text-center text-sm font-medium py-2 rounded-lg border border-surface-border text-surface-text">
-              Log in
+        <div className="lg:hidden border-b border-border bg-card px-4 pt-3 pb-6 space-y-2">
+          <Link href="/features" className="block text-sm font-medium py-1.5 text-text hover:text-primary">Features</Link>
+          <Link href="/how-it-works" className="block text-sm font-medium py-1.5 text-text hover:text-primary">How It Works</Link>
+          <Link href="/seo-website-audit" className="block text-sm font-medium py-1.5 text-text hover:text-primary">SEO Website Audit</Link>
+          <Link href="/geo-optimization" className="block text-sm font-medium py-1.5 text-text hover:text-primary">GEO Optimization</Link>
+          <Link href="/aeo-optimization" className="block text-sm font-medium py-1.5 text-text hover:text-primary">AEO Optimization</Link>
+          <Link href="/gsc-intelligence" className="block text-sm font-medium py-1.5 text-text hover:text-primary">GSC Intelligence</Link>
+          <Link href="/action-management" className="block text-sm font-medium py-1.5 text-text hover:text-primary">Action Center</Link>
+          <Link href="/pricing" className="block text-sm font-medium py-1.5 text-text hover:text-primary">Pricing</Link>
+          <Link href="/trust-and-methodology" className="block text-sm font-medium py-1.5 text-accent">Trust & Methodology</Link>
+          <div className="pt-3 border-t border-border flex flex-col gap-2">
+            <Link href="/login" className="text-center text-sm font-medium h-10 flex items-center justify-center rounded-md border border-border text-text bg-card hover:bg-slate-50">
+              Sign In
             </Link>
-            <Link href="/dashboard" className="text-center text-sm font-semibold py-2 rounded-lg bg-brand-600 text-white">
-              Launch App
+            <Link href="/dashboard" className="text-center text-sm font-medium h-10 flex items-center justify-center rounded-md bg-primary hover:bg-primary-hover text-white shadow-xs">
+              Get Started
             </Link>
           </div>
         </div>

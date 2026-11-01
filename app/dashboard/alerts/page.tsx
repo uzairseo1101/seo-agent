@@ -39,7 +39,7 @@ export default function AlertsPage() {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <div>
+    <div className="space-y-6">
       <DashboardHeader
         title="Alerts & Notification Center"
         subtitle="Automated in-app alerts for critical audit breakages, 28-day traffic drops and verified task fixes"
@@ -47,13 +47,13 @@ export default function AlertsPage() {
 
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         {/* Controls Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-surface-border shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-4 rounded-lg border border-border shadow-card">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-surface-muted">Filter:</span>
+            <span className="text-xs font-medium text-muted">Filter:</span>
             <select
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value)}
-              className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-surface-border bg-surface-bg outline-none"
+              className="text-xs font-medium px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs cursor-pointer"
             >
               <option value="all">All Alerts ({notifications.length})</option>
               <option value="critical">Critical Only</option>
@@ -61,7 +61,7 @@ export default function AlertsPage() {
               <option value="success">Verifications & Syncs</option>
             </select>
             {unreadCount > 0 && (
-              <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-mono font-medium text-primary bg-primary-tint border border-emerald-200 px-2.5 py-0.5 rounded-full">
                 {unreadCount} unread
               </span>
             )}
@@ -69,9 +69,9 @@ export default function AlertsPage() {
 
           <button
             onClick={handleMarkAllRead}
-            className="text-xs font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-border bg-white transition-colors self-start sm:self-auto"
+            className="text-xs font-medium text-text hover:bg-slate-50 flex items-center gap-1.5 px-3 h-10 rounded-md border border-border bg-card transition-colors shadow-xs self-start sm:self-auto"
           >
-            <Check className="w-3.5 h-3.5" />
+            <Check className="w-3.5 h-3.5 text-primary" />
             <span>Mark all as read</span>
           </button>
         </div>
@@ -81,54 +81,55 @@ export default function AlertsPage() {
           {filteredNotifications.map((notif) => (
             <div
               key={notif.id}
-              className={`p-5 rounded-xl border transition-all flex items-start gap-4 ${
+              className={`p-5 rounded-lg border transition-all flex items-start gap-4 ${
                 notif.isRead
-                  ? 'bg-white border-surface-border opacity-85'
-                  : 'bg-white border-indigo-200 ring-1 ring-indigo-50 shadow-sm'
+                  ? 'bg-card border-border opacity-85 shadow-card'
+                  : 'bg-card border-border border-l-4 border-l-primary shadow-pop'
               }`}
             >
               <div className="mt-0.5 shrink-0">
                 {notif.severity === 'critical' ? (
-                  <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center text-status-error">
-                    <AlertTriangle className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-md bg-red-50 border border-red-200 flex items-center justify-center text-error">
+                    <AlertTriangle className="w-4.5 h-4.5" />
                   </div>
                 ) : notif.severity === 'warning' ? (
-                  <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center text-status-warning">
-                    <TrendingDown className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-md bg-amber-50 border border-amber-200 flex items-center justify-center text-warning">
+                    <TrendingDown className="w-4.5 h-4.5" />
                   </div>
                 ) : (
-                  <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
-                    <CheckCircle2 className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-md bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary">
+                    <CheckCircle2 className="w-4.5 h-4.5" />
                   </div>
                 )}
               </div>
 
-              <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className={`text-xs font-bold ${notif.isRead ? 'text-navy' : 'text-indigo-950 font-extrabold'}`}>
-                    {notif.title}
-                  </h3>
-                  <span className="text-[11px] text-surface-muted shrink-0">
-                    {new Date(notif.createdAt).toLocaleDateString()}
+                  <h4 className="text-sm font-bold font-head text-text truncate">{notif.title}</h4>
+                  <span className="text-[11px] font-mono text-muted shrink-0">
+                    {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <p className="text-xs text-surface-muted leading-relaxed">{notif.message}</p>
 
-                <div className="pt-2 flex items-center gap-4">
+                <p className="text-xs text-muted mt-1 leading-relaxed">{notif.message}</p>
+
+                <div className="mt-3 flex items-center gap-4 text-xs font-mono">
                   {notif.linkUrl && (
                     <Link
                       href={notif.linkUrl}
-                      className="text-xs font-semibold text-brand-600 hover:underline flex items-center gap-1"
+                      className="text-accent hover:underline flex items-center gap-1 font-medium font-sans"
                     >
-                      View Details <ExternalLink className="w-3 h-3" />
+                      <span>Take Action</span>
+                      <ExternalLink className="w-3 h-3" />
                     </Link>
                   )}
+
                   {!notif.isRead && (
                     <button
                       onClick={() => handleMarkRead(notif.id)}
-                      className="text-xs text-surface-muted hover:text-navy"
+                      className="text-muted hover:text-text font-medium font-sans"
                     >
-                      Mark as read
+                      Dismiss
                     </button>
                   )}
                 </div>
@@ -137,9 +138,10 @@ export default function AlertsPage() {
           ))}
 
           {filteredNotifications.length === 0 && (
-            <div className="text-center py-12 bg-white rounded-xl border border-dashed border-surface-border">
-              <Bell className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs font-semibold text-navy">No alerts match the selected filter.</p>
+            <div className="text-center py-16 bg-card rounded-lg border border-dashed border-border shadow-card space-y-3">
+              <Bell className="w-10 h-10 text-muted mx-auto" />
+              <p className="text-sm font-medium text-text">No notifications to display.</p>
+              <p className="text-xs text-muted">You are completely up to date.</p>
             </div>
           )}
         </div>
