@@ -1,6 +1,7 @@
 import {
   Website,
   AuditFinding,
+  AuditRun,
   ActionItem,
   SeoOpportunity,
   AppNotification,
@@ -11,6 +12,7 @@ import {
 import {
   mockWebsites,
   mockFindings,
+  mockAuditRuns,
   mockActionItems,
   mockOpportunities,
   mockNotifications,
@@ -22,6 +24,7 @@ import {
 // In-Memory state for local sessions
 class StorageService {
   private websites: Website[] = [...mockWebsites];
+  private auditRuns: AuditRun[] = [...mockAuditRuns];
   private findings: AuditFinding[] = [...mockFindings];
   private actionItems: ActionItem[] = [...mockActionItems];
   private opportunities: SeoOpportunity[] = [...mockOpportunities];
@@ -76,6 +79,30 @@ class StorageService {
     this.findings = this.findings.filter(f => f.websiteId !== id);
     this.actionItems = this.actionItems.filter(a => a.websiteId !== id);
     return this.websites.length < initialLen;
+  }
+
+  // Audit Runs
+  getAuditRuns(websiteId?: string): AuditRun[] {
+    if (websiteId) {
+      return this.auditRuns.filter(r => r.websiteId === websiteId);
+    }
+    return this.auditRuns;
+  }
+
+  saveAuditRun(run: AuditRun, newFindings: AuditFinding[]): void {
+    this.auditRuns.unshift(run);
+
+    // Replace or prepend findings for this website
+    this.findings = [...newFindings, ...this.findings.filter(f => f.websiteId !== run.websiteId)];
+
+    // Update website latest scores and audited date
+    const targetSite = this.websites.find(w => w.id === run.websiteId);
+    if (targetSite) {
+      targetSite.latestSeoScore = run.seoScore;
+      targetSite.latestGeoScore = run.geoScore;
+      targetSite.latestAeoScore = run.aeoScore;
+      targetSite.lastAuditedAt = run.completedAt || new Date().toISOString();
+    }
   }
 
   // Findings
@@ -152,6 +179,10 @@ class StorageService {
   // Notifications
   getNotifications(): AppNotification[] {
     return this.notifications;
+  }
+
+  addNotification(notif: AppNotification): void {
+    this.notifications.unshift(notif);
   }
 
   markNotificationAsRead(id: string): void {
