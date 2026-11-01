@@ -121,12 +121,60 @@ class StorageService {
     return this.opportunities;
   }
 
+  saveOpportunities(websiteId: string, newOpps: SeoOpportunity[]): void {
+    // Replace opportunities for this website with latest findings
+    this.opportunities = [
+      ...newOpps,
+      ...this.opportunities.filter(o => o.websiteId !== websiteId),
+    ];
+  }
+
+  createActionItemFromOpportunity(oppId: string): ActionItem | null {
+    const opp = this.opportunities.find(o => o.id === oppId);
+    if (!opp) return null;
+
+    const existing = this.actionItems.find(a => a.sourceId === oppId);
+    if (existing) return existing;
+
+    const newTask: ActionItem = {
+      id: `act-opp-${Date.now()}`,
+      organizationId: this.currentOrg.id,
+      websiteId: opp.websiteId,
+      sourceType: 'seo_opportunity',
+      sourceId: opp.id,
+      title: `Optimize: "${opp.query}"`,
+      description: opp.hypothesis,
+      category: 'content',
+      priority: opp.potentialImpact === 'critical' ? 'critical' : opp.potentialImpact === 'high' ? 'high' : 'medium',
+      affectedUrl: opp.pageUrl,
+      recommendedSolution: opp.recommendedAction,
+      steps: [
+        `Review SERP snippet ranking for query: "${opp.query}"`,
+        `Update title and meta description on ${opp.pageUrl} to align with search intent`,
+        `Add contextual internal link anchors from related blog or category articles`,
+        `Request re-indexing via Google Search Console`,
+      ],
+      status: 'todo',
+      verificationStatus: 'unverified',
+      dueDate: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+    };
+
+    this.actionItems.unshift(newTask);
+    return newTask;
+  }
+
   // Action Items
   getActionItems(websiteId?: string): ActionItem[] {
     if (websiteId) {
       return this.actionItems.filter(a => a.websiteId === websiteId);
     }
     return this.actionItems;
+  }
+
+  addActionItem(item: ActionItem): ActionItem {
+    this.actionItems.unshift(item);
+    return item;
   }
 
   createActionItemFromFinding(findingId: string): ActionItem | null {
