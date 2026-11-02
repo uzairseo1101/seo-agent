@@ -23,6 +23,7 @@ export default function SignUpPage() {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,16 +37,28 @@ export default function SignUpPage() {
 
     try {
       if (isSupabaseConfigured && supabase) {
-        const { error: authError } = await supabase.auth.signUp({
+        const redirectUrl = typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback?next=/dashboard`
+          : 'https://seoagent.uzairseo.com/auth/callback?next=/dashboard';
+
+        const { data, error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: fullName,
             },
+            emailRedirectTo: redirectUrl,
           },
         });
         if (authError) throw authError;
+
+        // If email confirmation is required, session is null until confirmed
+        if (data?.user && !data?.session) {
+          setConfirmationSent(true);
+          setLoading(false);
+          return;
+        }
       }
       // Instant redirect to dashboard
       router.push('/dashboard');
@@ -110,8 +123,34 @@ export default function SignUpPage() {
                 </div>
               )}
 
-              {/* Form */}
-              <form onSubmit={handleRegister} className="space-y-3.5">
+              {confirmationSent ? (
+                <div className="space-y-5 py-6 text-center animate-in fade-in">
+                  <div className="w-14 h-14 rounded-full bg-primary-tint text-primary flex items-center justify-center mx-auto border border-emerald-200">
+                    <CheckCircle2 className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-bold font-head text-text">Confirm your email address</h2>
+                    <p className="text-xs text-muted leading-relaxed max-w-sm mx-auto">
+                      We have sent a verification email to <strong className="text-text">{email}</strong>.
+                    </p>
+                    <p className="text-xs text-muted leading-relaxed max-w-sm mx-auto">
+                      Please check your inbox (and spam folder) and click the confirmation link to activate your account.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <Link
+                      href="/signin"
+                      className="w-full h-10 px-4 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-md shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <span>Go to Sign In</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Form */}
+                  <form onSubmit={handleRegister} className="space-y-3.5">
                 <div>
                   <label className="text-xs font-semibold text-text block mb-1">
                     Full Name
@@ -225,6 +264,8 @@ export default function SignUpPage() {
                   Continue with Google
                 </button>
               </div>
+                </>
+              )}
             </div>
 
             <p className="text-xs text-muted text-center pt-2">

@@ -31,6 +31,10 @@ export default function SignInPage() {
       if (redirect) {
         setRedirectPath(redirect);
       }
+      const urlError = params.get('error');
+      if (urlError) {
+        setError(urlError);
+      }
     }
   }, []);
 
