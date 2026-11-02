@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 import { Website, AuditFinding, SeoOpportunity, ActionItem } from '@/lib/types';
 import { mockGscTrends } from '@/lib/mock-data';
 import {
@@ -40,7 +41,13 @@ import { Tooltip } from '@/components/ui/tooltip';
 
 export default function DashboardOverviewPage() {
   const router = useRouter();
-  const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
+  const [websites, setWebsites] = useState<Website[]>(() => {
+    return storage.getWebsites().filter(
+      (w) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+    );
+  });
   const [findings, setFindings] = useState<AuditFinding[]>(storage.getFindings());
   const [opportunities, setOpportunities] = useState<SeoOpportunity[]>(storage.getOpportunities());
   const [tasks, setTasks] = useState<ActionItem[]>(storage.getActionItems());
@@ -49,14 +56,26 @@ export default function DashboardOverviewPage() {
     let mounted = true;
     const syncData = async () => {
       try {
+        const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
         const [webRes, taskRes] = await Promise.all([
-          fetch('/api/websites'),
-          fetch('/api/tasks'),
+          fetch('/api/websites', { headers }),
+          fetch('/api/tasks', { headers }),
         ]);
         if (webRes.ok && mounted) {
           const webJson = await webRes.json();
-          if (webJson.success && webJson.websites) {
-            setWebsites(webJson.websites);
+          if (webJson.success && Array.isArray(webJson.websites)) {
+            const clean = webJson.websites.filter(
+              (w: Website) =>
+                !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name) &&
+                !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
+            );
+            setWebsites(clean);
           }
         }
         if (taskRes.ok && mounted) {
@@ -255,7 +274,7 @@ export default function DashboardOverviewPage() {
               <span className="text-xs font-mono text-muted">/ 100</span>
             </div>
             <p className="mt-2 text-xs text-muted truncate">
-              {primaryWebsite?.name} • 30+ technical checks
+              {primaryWebsite?.name || 'No domain connected'} • 30+ technical checks
             </p>
           </div>
 

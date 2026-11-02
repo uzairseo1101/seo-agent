@@ -1,5 +1,6 @@
-import { createAdminClient, createServerClient, isServerSupabaseConfigured } from '@/lib/supabase-server';
+import { createAdminClient, createServerClient, getSupabaseServerClient, isServerSupabaseConfigured } from '@/lib/supabase-server';
 import { storage } from '@/lib/storage';
+import { NextRequest } from 'next/server';
 import {
   Website,
   AuditRun,
@@ -11,21 +12,86 @@ import {
   TaskPriority,
 } from '@/lib/types';
 
+function isValidUuid(id?: string): boolean {
+  if (!id) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
 /**
  * Unified Database Access Layer.
  * Interacts directly with Supabase PostgreSQL if credentials exist,
- * otherwise falls back gracefully to in-memory/localStorage mock storage.
+ * otherwise falls back gracefully to in-memory/localStorage storage.
  */
 class DatabaseService {
-  private getClient() {
-    return createAdminClient() || createServerClient();
+  private getClient(req?: NextRequest | Headers | null) {
+    return getSupabaseServerClient(req) || createAdminClient() || createServerClient();
+  }
+
+  /**
+   * Resolves a valid UUID organization for website creation:
+   * 1. Checks if client is an authenticated user belonging to an organization in memberships.
+   * 2. Checks public.organizations for any existing organization UUID.
+   * 3. Inserts a default organization with a valid UUID if none exists.
+   */
+  private async getOrCreateDefaultOrganization(client: any): Promise<string> {
+    try {
+      // 1. Authenticated user organization resolution
+      try {
+        const { data: authData } = await client.auth.getUser();
+        if (authData?.user?.id) {
+          const { data: member } = await client
+            .from('memberships')
+            .select('organization_id')
+            .eq('user_id', authData.user.id)
+            .limit(1)
+            .maybeSingle();
+          if (member?.organization_id && isValidUuid(member.organization_id)) {
+            return member.organization_id;
+          }
+        }
+      } catch {
+        // Silently continue
+      }
+
+      // 2. Query public.organizations
+      const { data: org } = await client
+        .from('organizations')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      if (org?.id && isValidUuid(org.id)) {
+        return org.id;
+      }
+
+      // 3. Create a default organization with valid UUID
+      const newOrgId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000001';
+      const { data: created } = await client
+        .from('organizations')
+        .insert({
+          id: newOrgId,
+          name: 'Apex Growth Marketing',
+          slug: `agency-${Date.now()}`,
+          plan: 'agency',
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (created?.id && isValidUuid(created.id)) {
+        return created.id;
+      }
+      return newOrgId;
+    } catch (e) {
+      console.warn('Error resolving organization UUID:', e);
+      return '00000000-0000-0000-0000-000000000001';
+    }
   }
 
   // ==========================================
   // WEBSITES
   // ==========================================
-  async getWebsites(): Promise<Website[]> {
-    const client = this.getClient();
+  async getWebsites(req?: NextRequest | Headers | null): Promise<Website[]> {
+    const client = this.getClient(req);
     if (client) {
       try {
         const { data, error } = await client
@@ -34,7 +100,7 @@ class DatabaseService {
           .order('created_at', { ascending: false });
 
         if (!error && data) {
-          return data.map((row: any) => ({
+          const mapped: Website[] = data.map((row: any) => ({
             id: row.id,
             organizationId: row.organization_id,
             name: row.name,
@@ -47,6 +113,15 @@ class DatabaseService {
             lastAuditedAt: row.last_audited_at || undefined,
             createdAt: row.created_at || new Date().toISOString(),
           }));
+
+          // Sync into memory cache
+          mapped.forEach((w) => {
+            storage.addWebsite(w);
+          });
+
+          return mapped;
+        } else if (error) {
+          console.error('Database getWebsites error:', error);
         }
       } catch (e) {
         console.error('Database getWebsites fallback:', e);
@@ -55,8 +130,8 @@ class DatabaseService {
     return storage.getWebsites();
   }
 
-  async getWebsiteById(id: string): Promise<Website | null> {
-    const client = this.getClient();
+  async getWebsiteById(id: string, req?: NextRequest | Headers | null): Promise<Website | null> {
+    const client = this.getClient(req);
     if (client) {
       try {
         const { data, error } = await client
@@ -87,21 +162,29 @@ class DatabaseService {
     return storage.getWebsiteById(id) || null;
   }
 
-  async createWebsite(data: {
-    name: string;
-    domain: string;
-    url: string;
-    id?: string;
-    organizationId?: string;
-  }): Promise<Website> {
+  async createWebsite(
+    data: {
+      name: string;
+      domain: string;
+      url: string;
+      id?: string;
+      organizationId?: string;
+    },
+    req?: NextRequest | Headers | null
+  ): Promise<Website> {
     const cleanDomain = data.domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     const cleanUrl = data.url.startsWith('http') ? data.url.trim() : `https://${data.url.trim()}`;
-    const generatedId = data.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `web-${Date.now()}`);
-    const orgId = data.organizationId || storage.getOrganization().id;
+    const generatedId = (data.id && isValidUuid(data.id))
+      ? data.id
+      : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000001');
 
-    const client = this.getClient();
+    const client = this.getClient(req);
     if (client) {
       try {
+        const orgId = (data.organizationId && isValidUuid(data.organizationId))
+          ? data.organizationId
+          : await this.getOrCreateDefaultOrganization(client);
+
         const { data: row, error } = await client
           .from('websites')
           .insert({
@@ -118,7 +201,9 @@ class DatabaseService {
           .select()
           .single();
 
-        if (!error && row) {
+        if (error) {
+          console.error('Database createWebsite error:', error);
+        } else if (row) {
           const newSite: Website = {
             id: row.id,
             organizationId: row.organization_id,
@@ -132,7 +217,7 @@ class DatabaseService {
             createdAt: row.created_at || new Date().toISOString(),
           };
           storage.addWebsite(newSite);
-          await this.logActivity('website_created', 'website', newSite.id, { name: newSite.name, domain: newSite.domain });
+          await this.logActivity('website_created', 'website', newSite.id, { name: newSite.name, domain: newSite.domain }, req);
           return newSite;
         }
       } catch (e) {
@@ -146,12 +231,12 @@ class DatabaseService {
       domain: cleanDomain,
       url: cleanUrl,
     });
-    await this.logActivity('website_created', 'website', created.id, { name: created.name, domain: created.domain });
+    await this.logActivity('website_created', 'website', created.id, { name: created.name, domain: created.domain }, req);
     return created;
   }
 
-  async deleteWebsite(id: string): Promise<boolean> {
-    const client = this.getClient();
+  async deleteWebsite(id: string, req?: NextRequest | Headers | null): Promise<boolean> {
+    const client = this.getClient(req);
     if (client) {
       try {
         await client.from('websites').delete().eq('id', id);
@@ -159,7 +244,7 @@ class DatabaseService {
         console.error('Database deleteWebsite fallback:', e);
       }
     }
-    await this.logActivity('website_deleted', 'website', id);
+    await this.logActivity('website_deleted', 'website', id, {}, req);
     return storage.deleteWebsite(id);
   }
 
@@ -270,7 +355,7 @@ class DatabaseService {
           query = query.eq('website_id', websiteId);
         }
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data.map((row: any) => ({
             id: row.id,
             organizationId: row.organization_id,
@@ -394,13 +479,19 @@ class DatabaseService {
   // ==========================================
   // ACTIVITY LOGS
   // ==========================================
-  async logActivity(action: string, entityType: string, entityId?: string, metadata?: any): Promise<void> {
-    const client = this.getClient();
+  async logActivity(
+    action: string,
+    entityType: string,
+    entityId?: string,
+    metadata?: any,
+    req?: NextRequest | Headers | null
+  ): Promise<void> {
+    const client = this.getClient(req);
     if (client) {
       try {
-        const org = storage.getOrganization();
+        const orgId = await this.getOrCreateDefaultOrganization(client);
         await client.from('activity_logs').insert({
-          organization_id: org.id,
+          organization_id: orgId,
           action,
           entity_type: entityType,
           entity_id: entityId || null,

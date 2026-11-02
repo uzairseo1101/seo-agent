@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Bell, Plus, Globe, Shield, Moon, Sun } from 'lucide-react';
+import { Bell, Plus, Globe, Moon, Sun } from 'lucide-react';
 import { storage } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
+import { Website } from '@/lib/types';
 
 export default function DashboardHeader({
   title,
@@ -14,7 +16,13 @@ export default function DashboardHeader({
   subtitle?: string;
   actionButton?: React.ReactNode;
 }) {
-  const websites = storage.getWebsites();
+  const [websites, setWebsites] = useState<Website[]>(() => {
+    return storage.getWebsites().filter(
+      (w) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+    );
+  });
   const [selectedWeb, setSelectedWeb] = useState(websites[0]?.id || '');
   const notifications = storage.getNotifications();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -22,7 +30,8 @@ export default function DashboardHeader({
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const isDarkMode = document.documentElement.classList.contains('dark') ||
+      const isDarkMode =
+        document.documentElement.classList.contains('dark') ||
         localStorage.getItem('theme') === 'dark';
       setIsDark(isDarkMode);
       if (isDarkMode) {
@@ -30,6 +39,40 @@ export default function DashboardHeader({
       }
     }
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadWebsites = async () => {
+      try {
+        const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const res = await fetch('/api/websites', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.websites) && mounted) {
+            const clean = data.websites.filter(
+              (w: Website) =>
+                !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+            );
+            setWebsites(clean);
+            if (clean.length > 0 && !selectedWeb) {
+              setSelectedWeb(clean[0].id);
+            }
+          }
+        }
+      } catch {
+        // Silently use current state
+      }
+    };
+    loadWebsites();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedWeb]);
 
   const toggleDarkMode = () => {
     const nextDark = !isDark;
@@ -53,13 +96,7 @@ export default function DashboardHeader({
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Mock/Dev Mode Indicator */}
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-border text-[11px] text-muted font-medium">
-          <Shield className="w-3.5 h-3.5 text-accent" />
-          <span>Local Storage Dual-Mode</span>
-        </div>
-
-        {/* Website Selector */}
+        {/* Website Selector (when websites are connected) */}
         {websites.length > 0 && (
           <div className="flex items-center gap-2 bg-card border border-border px-3 py-1.5 rounded-md text-xs font-medium text-text h-10 shadow-xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
             <Globe className="w-3.5 h-3.5 text-muted shrink-0" />
@@ -105,7 +142,7 @@ export default function DashboardHeader({
         ) : (
           <Link
             href="/dashboard/audits"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-text bg-card hover:bg-slate-50 border border-border px-3.5 h-10 rounded-md shadow-xs transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-text bg-card hover:bg-slate-50 dark:hover:bg-slate-800 border border-border px-3.5 h-10 rounded-md shadow-xs transition-colors"
           >
             <Plus className="w-3.5 h-3.5 text-muted" />
             <span>New Audit</span>

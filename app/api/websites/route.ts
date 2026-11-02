@@ -1,39 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { storage } from '@/lib/storage';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { db } from '@/lib/db';
 import { Website } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   try {
-    // If Supabase is configured, attempt to query from Supabase
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('websites')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        // Map database snake_case to frontend camelCase
-        const mappedWebsites: Website[] = data.map((row: any) => ({
-          id: row.id,
-          organizationId: row.organization_id,
-          name: row.name,
-          domain: row.domain,
-          url: row.url,
-          status: row.status || 'active',
-          latestSeoScore: Number(row.latest_seo_score) || 0,
-          latestGeoScore: Number(row.latest_geo_score) || 0,
-          latestAeoScore: Number(row.latest_aeo_score) || 0,
-          lastAuditedAt: row.last_audited_at || undefined,
-          createdAt: row.created_at || new Date().toISOString(),
-        }));
-        return NextResponse.json({ success: true, websites: mappedWebsites });
-      }
-    }
-
-    // Fallback to storage service
-    const websites = storage.getWebsites();
-    return NextResponse.json({ success: true, websites });
+    const websites = await db.getWebsites(req);
+    // Filter out any legacy mock placeholder websites if any linger
+    const cleanWebsites = websites.filter(
+      (w: Website) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name) &&
+        !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
+    );
+    return NextResponse.json({ success: true, websites: cleanWebsites });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || 'Failed to retrieve websites.' },
@@ -54,64 +33,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cleanDomain = domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
-    const cleanUrl = url.startsWith('http') ? url.trim() : `https://${url.trim()}`;
-    const generatedId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `web-${Date.now()}`;
-    const org = storage.getOrganization();
+    const newWebsite = await db.createWebsite(
+      {
+        name: name.trim(),
+        domain: domain.trim(),
+        url: url.trim(),
+      },
+      req
+    );
 
-    // If Supabase is configured, attempt to persist directly
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from('websites')
-        .insert({
-          id: generatedId,
-          organization_id: org.id,
-          name: name.trim(),
-          domain: cleanDomain,
-          url: cleanUrl,
-          status: 'active',
-          latest_seo_score: 0,
-          latest_geo_score: 0,
-          latest_aeo_score: 0,
-        })
-        .select()
-        .single();
-
-      if (!error && data) {
-        const newWebsite: Website = {
-          id: data.id,
-          organizationId: data.organization_id,
-          name: data.name,
-          domain: data.domain,
-          url: data.url,
-          status: data.status || 'active',
-          latestSeoScore: 0,
-          latestGeoScore: 0,
-          latestAeoScore: 0,
-          createdAt: data.created_at || new Date().toISOString(),
-        };
-
-        // Also sync into local storage cache
-        storage.addWebsite({
-          id: newWebsite.id,
-          name: newWebsite.name,
-          domain: newWebsite.domain,
-          url: newWebsite.url,
-        });
-
-        return NextResponse.json({ success: true, website: newWebsite });
-      }
-    }
-
-    // Fallback: save to storage service
-    const added = storage.addWebsite({
-      id: generatedId,
-      name: name.trim(),
-      domain: cleanDomain,
-      url: cleanUrl,
-    });
-
-    return NextResponse.json({ success: true, website: added });
+    return NextResponse.json({ success: true, website: newWebsite });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || 'Failed to add website.' },
@@ -127,11 +58,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'id is required.' }, { status: 400 });
     }
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('websites').delete().eq('id', id);
-    }
-
-    const deleted = storage.deleteWebsite(id);
+    const deleted = await db.deleteWebsite(id, req);
     return NextResponse.json({ success: true, deleted });
   } catch (err: any) {
     return NextResponse.json(

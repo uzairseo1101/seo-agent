@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 import { AuditRun, AuditFinding, FindingCategory, FindingSeverity, Website } from '@/lib/types';
 import {
   FileSearch,
@@ -23,14 +24,22 @@ import {
   Bot,
   RefreshCw,
   CheckCircle,
-  XCircle
+  XCircle,
+  Globe,
+  Plus
 } from 'lucide-react';
 
 export default function AuditsPage() {
-  const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
+  const [websites, setWebsites] = useState<Website[]>(() => {
+    return storage.getWebsites().filter(
+      (w) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+    );
+  });
   const [selectedWebsiteId, setSelectedWebsiteId] = useState(websites[0]?.id || '');
-  const [auditRuns, setAuditRuns] = useState<AuditRun[]>(storage.getAuditRuns());
-  const [findings, setFindings] = useState<AuditFinding[]>(storage.getFindings());
+  const [auditRuns, setAuditRuns] = useState<AuditRun[]>([]);
+  const [findings, setFindings] = useState<AuditFinding[]>([]);
 
   // Filter state
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -48,13 +57,29 @@ export default function AuditsPage() {
     let mounted = true;
     const fetchWebsites = async () => {
       try {
-        const res = await fetch('/api/websites');
+        const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const res = await fetch('/api/websites', { headers });
         if (res.ok) {
           const data = await res.json();
-          if (data.success && data.websites && data.websites.length > 0 && mounted) {
-            setWebsites(data.websites);
-            if (!selectedWebsiteId || !data.websites.some((w: Website) => w.id === selectedWebsiteId)) {
-              setSelectedWebsiteId(data.websites[0].id);
+          if (data.success && Array.isArray(data.websites) && mounted) {
+            const cleanWebsites = data.websites.filter(
+              (w: Website) =>
+                !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name) &&
+                !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
+            );
+            setWebsites(cleanWebsites);
+            if (cleanWebsites.length > 0) {
+              if (!selectedWebsiteId || !cleanWebsites.some((w: Website) => w.id === selectedWebsiteId)) {
+                setSelectedWebsiteId(cleanWebsites[0].id);
+              }
+            } else {
+              setSelectedWebsiteId('');
             }
           }
         }
@@ -66,7 +91,7 @@ export default function AuditsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [selectedWebsiteId]);
 
   const selectedWebsite = websites.find(w => w.id === selectedWebsiteId) || websites[0];
   const latestRun = auditRuns[0];
@@ -144,31 +169,54 @@ export default function AuditsPage() {
       />
 
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Banner with Target Domain Info */}
-        <div className="bg-card rounded-lg border border-border p-5 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary">
-              <FileSearch className="w-5 h-5" />
+        {websites.length === 0 ? (
+          <div className="bg-card rounded-lg border border-dashed border-border p-12 text-center shadow-card flex flex-col items-center justify-center max-w-2xl mx-auto space-y-4">
+            <div className="w-14 h-14 rounded-full bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary">
+              <Globe className="w-7 h-7" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold font-head text-text">Target: {selectedWebsite?.name}</h3>
-                <span className="text-[11px] font-mono text-muted">({selectedWebsite?.domain})</span>
-              </div>
-              <p className="text-xs text-muted mt-0.5">
-                Safe lightweight crawler with DNS validation, private IP blocking, and robots.txt compliance.
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold font-head text-text">
+                No client websites connected yet
+              </h3>
+              <p className="text-xs text-muted max-w-md mx-auto">
+                Before running an automated crawler audit, connect your client domain to set DNS boundaries and safe crawling limits.
               </p>
             </div>
+            <Link
+              href="/dashboard/websites"
+              className="inline-flex items-center gap-1.5 h-10 px-5 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Connect Website First</span>
+            </Link>
           </div>
+        ) : (
+          <>
+            {/* Banner with Target Domain Info */}
+            <div className="bg-card rounded-lg border border-border p-5 shadow-card flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-md bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary">
+                  <FileSearch className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold font-head text-text">Target: {selectedWebsite?.name}</h3>
+                    <span className="text-[11px] font-mono text-muted">({selectedWebsite?.domain})</span>
+                  </div>
+                  <p className="text-xs text-muted mt-0.5">
+                    Safe lightweight crawler with DNS validation, private IP blocking, and robots.txt compliance.
+                  </p>
+                </div>
+              </div>
 
-          <button
-            onClick={() => setIsTriggerModalOpen(true)}
-            className="inline-flex items-center gap-1.5 h-10 px-4 border border-border bg-card hover:bg-slate-50 text-text rounded-md text-xs font-medium shadow-xs transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-muted" />
-            <span>Configure Crawl</span>
-          </button>
-        </div>
+              <button
+                onClick={() => setIsTriggerModalOpen(true)}
+                className="inline-flex items-center gap-1.5 h-10 px-4 border border-border bg-card hover:bg-slate-50 text-text rounded-md text-xs font-medium shadow-xs transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-muted" />
+                <span>Configure Crawl</span>
+              </button>
+            </div>
 
         {/* Task Added Notification Banner */}
         {taskAddedNotice && (
@@ -389,6 +437,8 @@ export default function AuditsPage() {
             ))}
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {/* Trigger Audit Modal */}

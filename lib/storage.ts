@@ -40,7 +40,14 @@ class StorageService {
         if (storedWebsites) {
           const parsed = JSON.parse(storedWebsites);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            this.websites = parsed;
+            // Filter out any legacy placeholder mock websites
+            const clean = parsed.filter((w: Website) =>
+              !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+              !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name) &&
+              !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
+            );
+            this.websites = clean;
+            localStorage.setItem('rp_websites', JSON.stringify(clean));
           }
         }
         const storedTasks = localStorage.getItem('rp_tasks');

@@ -4,11 +4,19 @@ import { generateClientReportData } from '../lib/reports/report-generator';
 import { storage } from '../lib/storage';
 
 test('Report Generator: Compiles complete client report with verified improvements', () => {
-  const websites = storage.getWebsites();
-  const report = generateClientReportData(websites[0].id, '2026-10-01', '2026-10-31');
+  const testSite = storage.addWebsite({
+    name: 'Test Client Analytics',
+    domain: 'saasflow.io',
+    url: 'https://saasflow.io',
+  });
+  testSite.latestSeoScore = 85;
+  testSite.latestGeoScore = 78;
+  testSite.latestAeoScore = 88;
+
+  const report = generateClientReportData(testSite.id, '2026-10-01', '2026-10-31');
 
   assert.ok(report, 'Must generate report');
-  assert.strictEqual(report.website.name, websites[0].name);
+  assert.strictEqual(report.website.name, testSite.name);
   assert.strictEqual(report.period.start, '2026-10-01');
   assert.strictEqual(report.period.end, '2026-10-31');
   assert.ok(report.scores.seoScore > 0, 'Must include SEO score');

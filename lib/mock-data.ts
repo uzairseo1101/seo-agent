@@ -20,7 +20,7 @@ export const mockUser: UserProfile = {
 };
 
 export const mockOrganization: Organization = {
-  id: 'org-101',
+  id: '00000000-0000-0000-0000-000000000001',
   name: 'Apex Growth Marketing',
   slug: 'apex-growth',
   plan: 'agency',
@@ -31,47 +31,7 @@ export const mockOrganization: Organization = {
   createdAt: '2026-01-15T09:30:00Z',
 };
 
-export const mockWebsites: Website[] = [
-  {
-    id: 'web-1',
-    organizationId: 'org-101',
-    name: 'SaaSFlow Analytics',
-    domain: 'saasflow.io',
-    url: 'https://saasflow.io',
-    status: 'active',
-    latestSeoScore: 84.5,
-    latestGeoScore: 78.0,
-    latestAeoScore: 88.5,
-    lastAuditedAt: '2026-10-30T14:15:00Z',
-    createdAt: '2026-02-01T10:00:00Z',
-  },
-  {
-    id: 'web-2',
-    organizationId: 'org-101',
-    name: 'Nordic Clean Living',
-    domain: 'nordicclean.com',
-    url: 'https://nordicclean.com',
-    status: 'active',
-    latestSeoScore: 71.0,
-    latestGeoScore: 65.5,
-    latestAeoScore: 62.0,
-    lastAuditedAt: '2026-10-28T11:20:00Z',
-    createdAt: '2026-02-15T12:00:00Z',
-  },
-  {
-    id: 'web-3',
-    organizationId: 'org-101',
-    name: 'Zenith Legal Partners',
-    domain: 'zenithlaw.co.uk',
-    url: 'https://zenithlaw.co.uk',
-    status: 'active',
-    latestSeoScore: 92.0,
-    latestGeoScore: 89.0,
-    latestAeoScore: 85.0,
-    lastAuditedAt: '2026-10-31T08:45:00Z',
-    createdAt: '2026-03-01T14:00:00Z',
-  },
-];
+export const mockWebsites: Website[] = [];
 
 export const mockFindings: AuditFinding[] = [
   {

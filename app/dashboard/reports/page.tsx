@@ -20,7 +20,13 @@ import {
 } from 'lucide-react';
 
 export default function ReportsPage() {
-  const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
+  const [websites, setWebsites] = useState<Website[]>(() => {
+    return storage.getWebsites().filter(
+      (w) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+    );
+  });
   const org = storage.getOrganization();
   const [selectedWebId, setSelectedWebId] = useState(websites[0]?.id || '');
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]);
@@ -33,10 +39,15 @@ export default function ReportsPage() {
         const res = await fetch('/api/websites');
         if (res.ok) {
           const data = await res.json();
-          if (data.success && data.websites && mounted) {
-            setWebsites(data.websites);
-            if (!selectedWebId && data.websites.length > 0) {
-              setSelectedWebId(data.websites[0].id);
+          if (data.success && Array.isArray(data.websites) && mounted) {
+            const clean = data.websites.filter(
+              (w: Website) =>
+                !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+            );
+            setWebsites(clean);
+            if (!selectedWebId && clean.length > 0) {
+              setSelectedWebId(clean[0].id);
             }
           }
         }
@@ -48,7 +59,7 @@ export default function ReportsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [selectedWebId]);
 
   const [report, setReport] = useState<FullClientReportData>(
     generateClientReportData(selectedWebId, startDate, endDate)
