@@ -4,15 +4,18 @@ import { executeWebsiteAudit } from '@/lib/analyzer/audit-engine';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { websiteId, maxPages, maxDepth } = body;
+    const { websiteId, maxPages, maxDepth, url, domain, name } = body;
 
-    if (!websiteId) {
-      return NextResponse.json({ success: false, error: 'websiteId is required.' }, { status: 400 });
+    if (!websiteId && !url) {
+      return NextResponse.json({ success: false, error: 'websiteId or url is required.' }, { status: 400 });
     }
 
-    const result = await executeWebsiteAudit(websiteId, {
+    const result = await executeWebsiteAudit(websiteId || `web-${Date.now()}`, {
       maxPages: typeof maxPages === 'number' ? Math.min(maxPages, 25) : 15,
       maxDepth: typeof maxDepth === 'number' ? Math.min(maxDepth, 2) : 1,
+      targetUrl: url,
+      targetDomain: domain,
+      targetName: name,
     });
 
     return NextResponse.json({

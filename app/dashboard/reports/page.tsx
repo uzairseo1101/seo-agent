@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
+import { Website } from '@/lib/types';
 import { generateClientReportData, FullClientReportData } from '@/lib/reports/report-generator';
 import {
   FileText,
@@ -19,11 +20,35 @@ import {
 } from 'lucide-react';
 
 export default function ReportsPage() {
-  const websites = storage.getWebsites();
+  const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
   const org = storage.getOrganization();
   const [selectedWebId, setSelectedWebId] = useState(websites[0]?.id || '');
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchSites = async () => {
+      try {
+        const res = await fetch('/api/websites');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.websites && mounted) {
+            setWebsites(data.websites);
+            if (!selectedWebId && data.websites.length > 0) {
+              setSelectedWebId(data.websites[0].id);
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback
+      }
+    };
+    fetchSites();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const [report, setReport] = useState<FullClientReportData>(
     generateClientReportData(selectedWebId, startDate, endDate)

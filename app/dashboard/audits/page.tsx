@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
-import { AuditRun, AuditFinding, FindingCategory, FindingSeverity } from '@/lib/types';
+import { AuditRun, AuditFinding, FindingCategory, FindingSeverity, Website } from '@/lib/types';
 import {
   FileSearch,
   CheckCircle2,
@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function AuditsPage() {
-  const [websites] = useState(storage.getWebsites());
+  const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
   const [selectedWebsiteId, setSelectedWebsiteId] = useState(websites[0]?.id || '');
   const [auditRuns, setAuditRuns] = useState<AuditRun[]>(storage.getAuditRuns());
   const [findings, setFindings] = useState<AuditFinding[]>(storage.getFindings());
@@ -42,6 +42,31 @@ export default function AuditsPage() {
   const [auditProgressStep, setAuditProgressStep] = useState<string>('');
   const [auditError, setAuditError] = useState<string>('');
   const [taskAddedNotice, setTaskAddedNotice] = useState<string | null>(null);
+
+  // Sync websites on mount
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchWebsites = async () => {
+      try {
+        const res = await fetch('/api/websites');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.websites && data.websites.length > 0 && mounted) {
+            setWebsites(data.websites);
+            if (!selectedWebsiteId || !data.websites.some((w: Website) => w.id === selectedWebsiteId)) {
+              setSelectedWebsiteId(data.websites[0].id);
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback to storage
+      }
+    };
+    fetchWebsites();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const selectedWebsite = websites.find(w => w.id === selectedWebsiteId) || websites[0];
   const latestRun = auditRuns[0];
@@ -64,6 +89,9 @@ export default function AuditsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           websiteId: selectedWebsiteId,
+          url: selectedWebsite?.url,
+          domain: selectedWebsite?.domain,
+          name: selectedWebsite?.name,
           maxPages: 15,
           maxDepth: 1,
         }),

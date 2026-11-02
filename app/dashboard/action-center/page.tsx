@@ -44,6 +44,28 @@ export default function ActionCenterPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
+  // Sync tasks on mount from database API
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch('/api/tasks');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.tasks && mounted) {
+            setTasks(data.tasks);
+          }
+        }
+      } catch (e) {
+        // Fallback to storage
+      }
+    };
+    fetchTasks();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Modals & Active task inspection
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [verifyingTaskId, setVerifyingTaskId] = useState<string | null>(null);
@@ -78,7 +100,17 @@ export default function ActionCenterPage() {
 
   const handleStatusChange = async (id: string, newStatus: TaskStatus) => {
     storage.updateActionItemStatus(id, newStatus);
-    setTasks([...storage.getActionItems()]);
+    setTasks(prev => prev.map(t => (t.id === id ? { ...t, status: newStatus } : t)));
+
+    try {
+      await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: newStatus }),
+      });
+    } catch (e) {
+      // Retain local update
+    }
   };
 
   const handleVerifyTask = async (taskId: string) => {
@@ -128,8 +160,8 @@ export default function ActionCenterPage() {
     });
 
     const data = await res.json();
-    if (data.success) {
-      setTasks([...storage.getActionItems()]);
+    if (data.success && data.task) {
+      setTasks(prev => [data.task, ...prev]);
       setIsNewTaskModalOpen(false);
       setNewTitle('');
       setNewUrl('');

@@ -21,7 +21,7 @@ import {
   mockOrganization
 } from './mock-data';
 
-// In-Memory state for local sessions
+// In-Memory state for local sessions with optional localStorage browser caching
 class StorageService {
   private websites: Website[] = [...mockWebsites];
   private auditRuns: AuditRun[] = [...mockAuditRuns];
@@ -32,6 +32,39 @@ class StorageService {
   private reports: ClientReport[] = [...mockReports];
   private currentUser: UserProfile = { ...mockUser };
   private currentOrg: Organization = { ...mockOrganization };
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        const storedWebsites = localStorage.getItem('rp_websites');
+        if (storedWebsites) {
+          const parsed = JSON.parse(storedWebsites);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.websites = parsed;
+          }
+        }
+        const storedTasks = localStorage.getItem('rp_tasks');
+        if (storedTasks) {
+          const parsed = JSON.parse(storedTasks);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            this.actionItems = parsed;
+          }
+        }
+      } catch (e) {
+        // Silently ignore storage hydration errors
+      }
+    }
+  }
+
+  private persist(key: string, data: any) {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (e) {
+        // Silently ignore storage write errors
+      }
+    }
+  }
 
   // Profile & Org
   getUser(): UserProfile {
@@ -56,9 +89,12 @@ class StorageService {
     return this.websites.find(w => w.id === id);
   }
 
-  addWebsite(data: { name: string; domain: string; url: string }): Website {
+  addWebsite(data: { name: string; domain: string; url: string; id?: string }): Website {
+    const generatedId = data.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `web-${Date.now()}`);
+    const existingIndex = this.websites.findIndex(w => w.id === generatedId);
+    
     const newWebsite: Website = {
-      id: `web-${Date.now()}`,
+      id: generatedId,
       organizationId: this.currentOrg.id,
       name: data.name,
       domain: data.domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, ''),
@@ -69,7 +105,14 @@ class StorageService {
       latestAeoScore: 0,
       createdAt: new Date().toISOString(),
     };
-    this.websites.unshift(newWebsite);
+
+    if (existingIndex >= 0) {
+      this.websites[existingIndex] = newWebsite;
+    } else {
+      this.websites.unshift(newWebsite);
+    }
+
+    this.persist('rp_websites', this.websites);
     return newWebsite;
   }
 
@@ -78,6 +121,8 @@ class StorageService {
     this.websites = this.websites.filter(w => w.id !== id);
     this.findings = this.findings.filter(f => f.websiteId !== id);
     this.actionItems = this.actionItems.filter(a => a.websiteId !== id);
+    this.persist('rp_websites', this.websites);
+    this.persist('rp_tasks', this.actionItems);
     return this.websites.length < initialLen;
   }
 

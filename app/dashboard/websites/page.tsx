@@ -20,6 +20,7 @@ export default function WebsitesManagementPage() {
   const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Website | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Form fields
   const [name, setName] = useState('');
@@ -27,16 +28,68 @@ export default function WebsitesManagementPage() {
   const [url, setUrl] = useState('');
   const [formError, setFormError] = useState('');
 
-  const handleAddWebsite = (e: React.FormEvent) => {
+  // Fetch websites from API on mount
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchWebsites = async () => {
+      try {
+        const res = await fetch('/api/websites');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.websites && mounted) {
+            setWebsites(data.websites);
+            // Sync locally
+            data.websites.forEach((w: Website) => {
+              storage.addWebsite({
+                id: w.id,
+                name: w.name,
+                domain: w.domain,
+                url: w.url,
+              });
+            });
+          }
+        }
+      } catch (err) {
+        // Fallback to initial storage state
+      }
+    };
+    fetchWebsites();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleAddWebsite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !domain.trim() || !url.trim()) {
       setFormError('All fields are required.');
       return;
     }
 
+    setIsLoading(true);
+    setFormError('');
+
     try {
-      const added = storage.addWebsite({ name, domain, url });
-      setWebsites([...storage.getWebsites()]);
+      const res = await fetch('/api/websites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, domain, url }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to add website.');
+      }
+
+      // Sync into local client storage cache
+      storage.addWebsite({
+        id: data.website.id,
+        name: data.website.name,
+        domain: data.website.domain,
+        url: data.website.url,
+      });
+
+      setWebsites(prev => [data.website, ...prev.filter(w => w.id !== data.website.id)]);
       setIsAddModalOpen(false);
       setName('');
       setDomain('');
@@ -44,13 +97,20 @@ export default function WebsitesManagementPage() {
       setFormError('');
     } catch (err: any) {
       setFormError(err.message || 'Failed to add website.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    try {
+      await fetch(`/api/websites?id=${deleteTarget.id}`, { method: 'DELETE' });
+    } catch (e) {
+      // Continue client cleanup
+    }
     storage.deleteWebsite(deleteTarget.id);
-    setWebsites([...storage.getWebsites()]);
+    setWebsites(prev => prev.filter(w => w.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
 

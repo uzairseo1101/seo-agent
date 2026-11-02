@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
+import { Website, AuditFinding, SeoOpportunity, ActionItem } from '@/lib/types';
 import { mockGscTrends } from '@/lib/mock-data';
 import {
   Globe,
@@ -39,11 +40,42 @@ import { Tooltip } from '@/components/ui/tooltip';
 
 export default function DashboardOverviewPage() {
   const router = useRouter();
-  const websites = storage.getWebsites();
+  const [websites, setWebsites] = useState<Website[]>(storage.getWebsites());
+  const [findings, setFindings] = useState<AuditFinding[]>(storage.getFindings());
+  const [opportunities, setOpportunities] = useState<SeoOpportunity[]>(storage.getOpportunities());
+  const [tasks, setTasks] = useState<ActionItem[]>(storage.getActionItems());
+
+  React.useEffect(() => {
+    let mounted = true;
+    const syncData = async () => {
+      try {
+        const [webRes, taskRes] = await Promise.all([
+          fetch('/api/websites'),
+          fetch('/api/tasks'),
+        ]);
+        if (webRes.ok && mounted) {
+          const webJson = await webRes.json();
+          if (webJson.success && webJson.websites) {
+            setWebsites(webJson.websites);
+          }
+        }
+        if (taskRes.ok && mounted) {
+          const taskJson = await taskRes.json();
+          if (taskJson.success && taskJson.tasks) {
+            setTasks(taskJson.tasks);
+          }
+        }
+      } catch (e) {
+        // Fallback
+      }
+    };
+    syncData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const primaryWebsite = websites[0];
-  const findings = storage.getFindings();
-  const opportunities = storage.getOpportunities();
-  const tasks = storage.getActionItems();
 
   const [quickPrompt, setQuickPrompt] = useState('');
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);

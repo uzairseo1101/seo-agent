@@ -16,6 +16,7 @@ import {
   FileText,
   ShieldCheck,
   Settings,
+  ShieldAlert,
   Bot,
   Building2,
   ChevronDown,
@@ -89,6 +90,7 @@ const navSections: NavSection[] = [
     title: 'Settings',
     items: [
       { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+      { name: 'Admin Console', href: '/admin', icon: ShieldAlert },
     ],
   },
 ];

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { storage } from '@/lib/storage';
+import { db } from '@/lib/db';
 import { ActionItem, TaskPriority, TaskStatus, FindingCategory } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
   const websiteId = req.nextUrl.searchParams.get('websiteId') || undefined;
-  const tasks = storage.getActionItems(websiteId);
+  const tasks = await db.getActionItems(websiteId);
   return NextResponse.json({ success: true, tasks });
 }
 
@@ -18,11 +19,11 @@ export async function POST(req: NextRequest) {
     }
 
     const org = storage.getOrganization();
-    const websites = storage.getWebsites();
+    const websites = await db.getWebsites();
     const targetWebId = websiteId || websites[0]?.id || 'web-1';
 
     const newTask: ActionItem = {
-      id: `act-manual-${Date.now()}`,
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `act-manual-${Date.now()}`,
       organizationId: org.id,
       websiteId: targetWebId,
       sourceType: 'manual',
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
     };
 
     storage.addActionItem(newTask);
+    await db.logActivity('task_created', 'action_item', newTask.id, { title: newTask.title });
 
     return NextResponse.json({ success: true, task: newTask });
   } catch (err: any) {
@@ -61,17 +63,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Task ID is required.' }, { status: 400 });
     }
 
-    const task = storage.getActionItems().find(t => t.id === id);
+    const task = await db.updateActionItemStatus(id, status as TaskStatus, userNotes);
     if (!task) {
       return NextResponse.json({ success: false, error: 'Task not found.' }, { status: 404 });
     }
 
-    if (status) {
-      storage.updateActionItemStatus(id, status as TaskStatus);
-    }
-    if (userNotes !== undefined) {
-      task.userNotes = userNotes;
-    }
     if (dueDate) {
       task.dueDate = dueDate;
     }
