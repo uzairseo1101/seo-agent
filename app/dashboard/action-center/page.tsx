@@ -256,7 +256,7 @@ export default function ActionCenterPage() {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         {/* Verification Result Feedback Drawer / Card */}
         {verificationFeedback && (
-          <div className="p-5 rounded-lg bg-card border-2 border-primary shadow-pop animate-in fade-in space-y-2.5">
+          <div className="p-5 rounded-xl bg-card border-2 border-primary shadow-xs animate-in fade-in space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {verificationFeedback.outcome === 'completed_verified' ? (
@@ -282,21 +282,21 @@ export default function ActionCenterPage() {
             <p className="text-xs text-muted leading-relaxed">
               {verificationFeedback.explanation}
             </p>
-            <div className="p-3 rounded-md bg-slate-100 dark:bg-slate-800 border border-border font-mono text-[11px] text-text">
+            <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-border font-mono text-[11px] text-text">
               Evidence captured: {verificationFeedback.afterEvidence}
             </div>
           </div>
         )}
 
         {/* Filter Bar & Header Controls (Single Primary Button) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-4 rounded-lg border border-border shadow-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border shadow-xs">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted">Status:</span>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-xs font-medium px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-xs"
+                className="text-xs font-medium px-3 h-9 rounded-lg border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-xs"
               >
                 <option value="all">All Statuses ({tasks.length})</option>
                 <option value="todo">To Do</option>
@@ -311,7 +311,7 @@ export default function ActionCenterPage() {
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                className="text-xs font-medium px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-xs"
+                className="text-xs font-medium px-3 h-9 rounded-lg border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-xs"
               >
                 <option value="all">All Priorities</option>
                 <option value="critical">Critical</option>
@@ -325,14 +325,14 @@ export default function ActionCenterPage() {
           <div className="flex items-center gap-3 self-start sm:self-auto">
             <button
               onClick={() => setIsAgentPanelOpen(!isAgentPanelOpen)}
-              className="h-10 px-3.5 rounded-md border border-border bg-card hover:bg-slate-50 text-accent font-medium text-xs shadow-xs transition-colors flex items-center gap-1.5"
+              className="h-9 px-3.5 rounded-lg border border-border bg-card hover:bg-slate-50 text-accent font-medium text-xs shadow-xs transition-colors flex items-center gap-1.5"
             >
               <Bot className="w-4 h-4 text-accent" />
               <span>{isAgentPanelOpen ? 'Hide Agent Chat' : 'Open Agent Chat'}</span>
             </button>
             <button
               onClick={() => setIsNewTaskModalOpen(true)}
-              className="h-10 px-4 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-medium shadow-xs transition-colors flex items-center gap-1.5"
+              className="h-9 px-4 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-medium shadow-xs transition-colors flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" />
               <span>Add Custom Task</span>
@@ -347,7 +347,7 @@ export default function ActionCenterPage() {
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-card rounded-lg border border-border p-6 shadow-card hover:border-slate-300 transition-colors space-y-4"
+                className="bg-card rounded-xl border border-border p-5 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all space-y-4"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -414,7 +414,7 @@ export default function ActionCenterPage() {
                 </div>
 
                 {/* Steps Box */}
-                <div className="p-3.5 rounded-md bg-bg border border-border text-xs space-y-1.5">
+                <div className="p-3.5 rounded-lg bg-bg border border-border text-xs space-y-1.5">
                   <p className="font-semibold text-text font-head">Recommended Implementation Steps:</p>
                   <ol className="list-decimal list-inside space-y-1 text-muted pl-1">
                     {task.steps.map((step, idx) => (
@@ -424,13 +424,13 @@ export default function ActionCenterPage() {
                 </div>
 
                 {/* Status Action Bar */}
-                <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border">
+                <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-text">Status:</span>
+                    <span className="text-xs font-medium text-muted">Status:</span>
                     <select
                       value={task.status}
                       onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
-                      className="text-xs font-medium px-2.5 h-8 rounded-md border border-border bg-card text-text outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs"
+                      className="text-xs font-medium px-2.5 h-8 rounded-lg border border-border bg-card text-text outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs"
                     >
                       <option value="todo">To Do</option>
                       <option value="in_progress">In Progress</option>
@@ -439,8 +439,9 @@ export default function ActionCenterPage() {
                     </select>
                   </div>
 
-                  <div className="text-[11px] font-mono text-muted flex items-center gap-3">
+                  <div className="text-[11px] text-muted flex items-center gap-3">
                     <span>Due: {task.dueDate || 'Unscheduled'}</span>
+                    <span className="text-border">•</span>
                     <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>

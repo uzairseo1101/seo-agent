@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
@@ -13,20 +13,16 @@ import {
   Sparkles,
   CheckCircle2,
   AlertTriangle,
-  ArrowUpRight,
   ArrowRight,
   TrendingUp,
   ShieldCheck,
-  Clock,
-  ExternalLink,
-  ChevronRight,
-  Bot,
-  Send,
-  HelpCircle,
-  X,
-  FileText,
+  Check,
   Search,
-  Check
+  ExternalLink,
+  Plus,
+  Play,
+  Layers,
+  ArrowUpRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -34,10 +30,8 @@ import {
   XAxis,
   YAxis,
   Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  CartesianGrid
+  ResponsiveContainer
 } from 'recharts';
-import { Tooltip } from '@/components/ui/tooltip';
 
 export default function DashboardOverviewPage() {
   const router = useRouter();
@@ -51,8 +45,9 @@ export default function DashboardOverviewPage() {
   const [findings, setFindings] = useState<AuditFinding[]>(storage.getFindings());
   const [opportunities, setOpportunities] = useState<SeoOpportunity[]>(storage.getOpportunities());
   const [tasks, setTasks] = useState<ActionItem[]>(storage.getActionItems());
+  const [activeTab, setActiveTab] = useState<'tasks' | 'opportunities'>('tasks');
 
-  React.useEffect(() => {
+  useEffect(() => {
     let mounted = true;
     const syncData = async () => {
       try {
@@ -66,6 +61,7 @@ export default function DashboardOverviewPage() {
           fetch('/api/websites', { headers }),
           fetch('/api/tasks', { headers }),
         ]);
+
         if (webRes.ok && mounted) {
           const webJson = await webRes.json();
           if (webJson.success && Array.isArray(webJson.websites)) {
@@ -95,466 +91,274 @@ export default function DashboardOverviewPage() {
   }, []);
 
   const primaryWebsite = websites[0];
-
-  const [quickPrompt, setQuickPrompt] = useState('');
-  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
-
-  const criticalFindings = findings.filter(f => f.severity === 'critical');
-  const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
-  const verifiedTasks = tasks.filter(t => t.verificationStatus === 'completed_verified');
-
-  const handleAskAgent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickPrompt.trim()) return;
-    router.push(`/dashboard/action-center?prompt=${encodeURIComponent(quickPrompt.trim())}`);
-  };
-
-  const handlePromptChip = (chip: string) => {
-    router.push(`/dashboard/action-center?prompt=${encodeURIComponent(chip)}`);
-  };
+  const pendingTasks = tasks.filter((t) => t.status !== 'completed');
+  const verifiedTasks = tasks.filter((t) => t.verificationStatus === 'completed_verified');
 
   return (
     <div className="space-y-6">
       <DashboardHeader
-        title="Agency Intelligence Overview"
-        subtitle="Cross-platform performance, audit scores, prioritized actions and verification tracking"
+        title="Dashboard"
+        subtitle={primaryWebsite ? `Monitoring ${primaryWebsite.name} (${primaryWebsite.domain})` : 'Multi-domain SEO intelligence and action management'}
       />
 
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
-        {/* 1. TOP "ASK THE AGENT" INPUT (Clean Rank spec) */}
-        <div className="bg-card rounded-lg border border-border p-4 sm:p-5 shadow-card space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-accent-tint text-accent flex items-center justify-center font-bold text-xs border border-blue-200">
-                AI
-              </div>
-              <span className="text-xs font-bold font-head text-text">
-                Ask the SEO Agent
-              </span>
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        {/* Zero State if No Websites Connected */}
+        {websites.length === 0 ? (
+          <div className="bg-card rounded-xl border border-dashed border-border p-12 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
+            <div className="w-12 h-12 rounded-full bg-primary-tint border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center text-primary">
+              <Globe className="w-6 h-6" />
             </div>
-            <span className="text-[11px] font-mono text-muted">
-              Natural Language Commands
-            </span>
-          </div>
-
-          <form onSubmit={handleAskAgent} className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="e.g. Audit example.com, find striking distance keywords, or check schema..."
-              value={quickPrompt}
-              onChange={(e) => setQuickPrompt(e.target.value)}
-              className="flex-1 text-xs px-3.5 h-10 rounded-md border border-border bg-bg text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
-            <button
-              type="submit"
-              disabled={!quickPrompt.trim()}
-              className="h-10 px-4 bg-primary hover:bg-primary-hover text-white text-xs font-medium rounded-md shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50 shrink-0"
-            >
-              <span>Ask agent</span>
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </form>
-
-          {/* Quick Prompt Chips */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-[11px] text-muted mr-1">Suggested:</span>
-            <button
-              type="button"
-              onClick={() => handlePromptChip('Find top 10 striking distance queries')}
-              className="px-2.5 py-1 rounded-sm bg-bg border border-border text-[11px] text-muted hover:text-text hover:bg-slate-100 transition-colors"
-            >
-              Striking distance queries
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePromptChip('Audit technical issues on primary site')}
-              className="px-2.5 py-1 rounded-sm bg-bg border border-border text-[11px] text-muted hover:text-text hover:bg-slate-100 transition-colors"
-            >
-              Audit technical issues
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePromptChip('Check AEO & GEO schema readiness')}
-              className="px-2.5 py-1 rounded-sm bg-bg border border-border text-[11px] text-muted hover:text-text hover:bg-slate-100 transition-colors"
-            >
-              Check AEO/GEO readiness
-            </button>
-          </div>
-        </div>
-
-        {/* 2. ONBOARDING CHECKLIST (Dismissible, guides new users) */}
-        {!onboardingDismissed && (
-          <div className="bg-card rounded-lg border border-primary/40 p-4 sm:p-5 shadow-card relative">
-            <button
-              onClick={() => setOnboardingDismissed(true)}
-              className="absolute top-3 right-3 text-muted hover:text-text p-1"
-              aria-label="Dismiss checklist"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <div className="space-y-3 pr-6">
-              <div>
-                <span className="text-[10px] font-mono font-bold uppercase text-primary tracking-wider">
-                  Getting Started Checklist
-                </span>
-                <h3 className="text-sm font-bold font-head text-text mt-0.5">
-                  Complete your initial setup to unlock automated SEO verification
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Link
-                  href="/dashboard/websites"
-                  className="p-3 rounded-md bg-bg border border-border hover:border-primary/50 transition-colors flex items-start gap-2.5"
-                >
-                  <div className="w-5 h-5 rounded-full bg-primary-tint text-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="w-3 h-3" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-text block">1. Add Website</span>
-                    <span className="text-[11px] text-muted block mt-0.5">
-                      {websites.length > 0 ? 'Domain connected' : 'Connect domain URL'}
-                    </span>
-                  </div>
-                </Link>
-
-                <Link
-                  href="/dashboard/audits"
-                  className="p-3 rounded-md bg-bg border border-border hover:border-primary/50 transition-colors flex items-start gap-2.5"
-                >
-                  <div className="w-5 h-5 rounded-full bg-primary-tint text-primary flex items-center justify-center shrink-0 mt-0.5">
-                    <Check className="w-3 h-3" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-text block">2. Run First Audit</span>
-                    <span className="text-[11px] text-muted block mt-0.5">
-                      30+ technical & schema checks
-                    </span>
-                  </div>
-                </Link>
-
-                <Link
-                  href="/dashboard/reports"
-                  className="p-3 rounded-md bg-bg border border-border hover:border-primary/50 transition-colors flex items-start gap-2.5"
-                >
-                  <div className="w-5 h-5 rounded-full bg-accent-tint text-accent flex items-center justify-center shrink-0 mt-0.5">
-                    <ArrowRight className="w-3 h-3" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-text block">3. Export First Report</span>
-                    <span className="text-[11px] text-muted block mt-0.5">
-                      Branded PDF with verified fixes
-                    </span>
-                  </div>
-                </Link>
-              </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold font-head text-text">No websites connected</h3>
+              <p className="text-xs text-muted max-w-sm mx-auto">
+                Connect your domain to run automated technical SEO crawls, monitor Search Console data, and track verified fixes.
+              </p>
             </div>
-          </div>
-        )}
-
-        {/* 3. STAT CARDS (Tabular numbers, Clean Rank styling) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Stat Card 1: SEO Health */}
-          <div className="bg-card p-5 rounded-lg border border-border shadow-card flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-medium text-muted">
-              <span className="flex items-center gap-1">
-                <span>SEO Health Score</span>
-                <Tooltip content="Score computed across meta tags, headings, speed, and indexing">
-                  <HelpCircle className="w-3 h-3 text-muted/60" />
-                </Tooltip>
-              </span>
-              <span className="font-mono text-xs font-medium text-primary bg-primary-tint border border-emerald-200/60 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                +4.2
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">
-                {primaryWebsite?.latestSeoScore || 0}
-              </span>
-              <span className="text-xs font-mono text-muted">/ 100</span>
-            </div>
-            <p className="mt-2 text-xs text-muted truncate">
-              {primaryWebsite?.name || 'No domain connected'} • 30+ technical checks
-            </p>
-          </div>
-
-          {/* Stat Card 2: GEO & AEO AI Engine Scores */}
-          <div className="bg-card p-5 rounded-lg border border-border shadow-card flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-medium text-muted">
-              <span className="flex items-center gap-1">
-                <span>AI Engine Visibility</span>
-                <Tooltip content="Generative Engine and Answer Engine readiness scores">
-                  <HelpCircle className="w-3 h-3 text-muted/60" />
-                </Tooltip>
-              </span>
-              <span className="font-mono text-[11px] font-medium text-accent bg-accent-tint border border-blue-200/60 px-2 py-0.5 rounded-full">
-                GEO & AEO
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-4">
-              <div>
-                <span className="text-[11px] text-muted block">GEO</span>
-                <span className="text-2xl font-bold font-mono text-text tracking-tight tnum">
-                  {primaryWebsite?.latestGeoScore || 0}
-                </span>
-              </div>
-              <div className="h-7 w-px bg-border"></div>
-              <div>
-                <span className="text-[11px] text-muted block">AEO</span>
-                <span className="text-2xl font-bold font-mono text-text tracking-tight tnum">
-                  {primaryWebsite?.latestAeoScore || 0}
-                </span>
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-muted truncate">
-              Entity clarity & answer engine readiness
-            </p>
-          </div>
-
-          {/* Stat Card 3: Action Items Pipeline */}
-          <div className="bg-card p-5 rounded-lg border border-border shadow-card flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-medium text-muted">
-              <span className="flex items-center gap-1">
-                <span>Action Center Tasks</span>
-                <Tooltip content="Prioritized action tasks derived from audit findings">
-                  <HelpCircle className="w-3 h-3 text-muted/60" />
-                </Tooltip>
-              </span>
-              <Link href="/dashboard/action-center" className="text-accent hover:underline flex items-center gap-0.5">
-                Manage <ArrowUpRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">
-                {tasks.length}
-              </span>
-              <span className="text-xs font-mono text-amber-700 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 px-2 py-0.5 rounded-full">
-                {inProgressTasks.length} in progress
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-muted">
-              {verifiedTasks.length} verified improvements
-            </p>
-          </div>
-
-          {/* Stat Card 4: GSC Opportunities */}
-          <div className="bg-card p-5 rounded-lg border border-border shadow-card flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-medium text-muted">
-              <span className="flex items-center gap-1">
-                <span>Striking Distance Queries</span>
-                <Tooltip content="Queries on positions 5-20 with high impression volume">
-                  <HelpCircle className="w-3 h-3 text-muted/60" />
-                </Tooltip>
-              </span>
-              <Link href="/dashboard/opportunities" className="text-accent hover:underline flex items-center gap-0.5">
-                Finder <ArrowUpRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">
-                {opportunities.length}
-              </span>
-              <span className="text-xs font-mono text-primary bg-primary-tint border border-emerald-200/60 px-2 py-0.5 rounded-full">
-                Pos 5–20
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-muted">
-              High-impression SERP targets
-            </p>
-          </div>
-        </div>
-
-        {/* 4. MAIN CHART (Green line with 10% area fill) + VERIFICATION SUMMARY */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card p-6 rounded-lg border border-border shadow-card space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border">
-              <div>
-                <h3 className="text-base font-bold font-head text-text flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  Search Console Organic Growth (Last 30 Days)
-                </h3>
-                <p className="text-xs text-muted">
-                  Actual organic impressions & clicks for {primaryWebsite?.domain}
-                </p>
-              </div>
-              <div className="flex items-center gap-4 text-xs font-mono">
-                <span className="flex items-center gap-1.5 text-text font-medium">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#059669]"></span> Clicks
-                </span>
-                <span className="flex items-center gap-1.5 text-muted">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#2563EB]"></span> Impressions
-                </span>
-              </div>
-            </div>
-
-            <div className="h-64 w-full pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockGscTrends}>
-                  <defs>
-                    <linearGradient id="cleanRankGreen" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#059669" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#059669" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#64748B"
-                    fontSize={11}
-                    fontFamily="IBM Plex Mono"
-                    tickLine={false}
-                  />
-                  <YAxis
-                    stroke="#64748B"
-                    fontSize={11}
-                    fontFamily="IBM Plex Mono"
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      borderColor: '#E2E8F0',
-                      borderRadius: '10px',
-                      color: '#0F172A',
-                      fontSize: '12px',
-                      fontFamily: 'IBM Plex Mono',
-                      boxShadow: '0 4px 12px rgba(15,23,42,.08)'
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="clicks"
-                    stroke="#059669"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#cleanRankGreen)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Verification & Action Status Summary */}
-          <div className="bg-card p-6 rounded-lg border border-border shadow-card flex flex-col justify-between space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-border">
-                <h3 className="text-base font-bold font-head text-text flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary" />
-                  Verification Engine
-                </h3>
-                <span className="text-[11px] font-mono text-primary bg-primary-tint px-2 py-0.5 rounded-full border border-emerald-200">
-                  Automated
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="p-3 rounded-md bg-primary-tint border border-emerald-200/80 flex items-start gap-3">
-                  <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-text">Completed — Verified</p>
-                    <p className="text-muted mt-0.5">Automated re-audit confirmed critical issue resolutions.</p>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 flex items-start gap-3">
-                  <Clock className="w-4 h-4 text-warning shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-text">Awaiting Re-Crawl</p>
-                    <p className="text-muted mt-0.5">2 tasks completed by team; scheduled for next audit pass.</p>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-md bg-bg border border-border flex items-start gap-3">
-                  <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-text">Open Critical Findings</p>
-                    <p className="text-muted mt-0.5">{criticalFindings.length} issue requiring immediate attention.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             <Link
-              href="/dashboard/action-center"
-              className="w-full h-10 flex items-center justify-center text-xs font-medium rounded-md border border-border bg-card hover:bg-slate-50 text-text transition-colors shadow-xs"
+              href="/dashboard/websites"
+              className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-medium shadow-xs transition-colors"
             >
-              Open Action Center
+              <Plus className="w-4 h-4" />
+              <span>Connect Website</span>
             </Link>
           </div>
-        </div>
-
-        {/* 5. TABLES: 48PX ROWS, MONO METRICS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Prioritized Action Tasks Table (48px rows) */}
-          <div className="bg-card rounded-lg border border-border shadow-card overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-sm font-bold font-head text-text flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
-                Prioritized Action Tasks
-              </h3>
-              <Link href="/dashboard/action-center" className="text-xs font-medium text-accent hover:underline">
-                View All
-              </Link>
-            </div>
-            <div className="divide-y divide-border">
-              {tasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="h-12 px-4 flex items-center justify-between hover:bg-bg transition-colors">
-                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                    <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full shrink-0 ${
-                      task.priority === 'critical' ? 'bg-red-50 text-error border border-red-200' :
-                      task.priority === 'high' ? 'bg-amber-50 text-warning border border-amber-200' :
-                      'bg-blue-50 text-accent border border-blue-200'
-                    }`}>
-                      {task.priority}
-                    </span>
-                    <span className="text-xs font-medium text-text truncate">{task.title}</span>
-                  </div>
-                  <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full shrink-0 ${
-                    task.status === 'completed' ? 'bg-primary-tint text-primary border border-emerald-200' :
-                    task.status === 'in_progress' ? 'bg-amber-50 text-warning border border-amber-200' :
-                    'bg-slate-100 text-muted border border-border'
-                  }`}>
-                    {task.status.replace('_', ' ')}
-                  </span>
+        ) : (
+          <>
+            {/* Top 4 Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: SEO Score */}
+              <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                <div className="flex items-center justify-between text-xs text-muted font-medium">
+                  <span>SEO Health Score</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
+                    {primaryWebsite?.latestSeoScore || 0}
+                  </span>
+                  <span className="text-xs text-muted">/ 100</span>
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  Technical, content & indexability factors
+                </p>
+              </div>
 
-          {/* Monitored Websites Table (48px rows) */}
-          <div className="bg-card rounded-lg border border-border shadow-card overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-sm font-bold font-head text-text flex items-center gap-2">
-                <Globe className="w-4 h-4 text-primary" />
-                Client Websites ({websites.length})
-              </h3>
-              <Link href="/dashboard/websites" className="text-xs font-medium text-accent hover:underline">
-                Manage
-              </Link>
+              {/* Card 2: AI Visibility */}
+              <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                <div className="flex items-center justify-between text-xs text-muted font-medium">
+                  <span>AI Engine Visibility</span>
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
+                    {Math.round(((primaryWebsite?.latestGeoScore || 0) + (primaryWebsite?.latestAeoScore || 0)) / 2) || 0}
+                  </span>
+                  <span className="text-xs text-muted">/ 100</span>
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  GEO entity graph & AEO schema readiness
+                </p>
+              </div>
+
+              {/* Card 3: Action Items */}
+              <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                <div className="flex items-center justify-between text-xs text-muted font-medium">
+                  <span>Action Items</span>
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
+                    {pendingTasks.length}
+                  </span>
+                  <span className="text-xs text-muted">to execute</span>
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  {verifiedTasks.length} improvements re-crawl verified
+                </p>
+              </div>
+
+              {/* Card 4: Organic Growth */}
+              <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+                <div className="flex items-center justify-between text-xs text-muted font-medium">
+                  <span>Organic Search</span>
+                  <span className="text-[11px] font-semibold text-primary font-mono">+14.2%</span>
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
+                    142.8k
+                  </span>
+                  <span className="text-xs text-muted">impressions</span>
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  Google Search Console (last 30 days)
+                </p>
+              </div>
             </div>
-            <div className="divide-y divide-border">
-              {websites.map((w) => (
-                <div key={w.id} className="h-12 px-4 flex items-center justify-between hover:bg-bg transition-colors">
-                  <div className="min-w-0 pr-2">
-                    <span className="text-xs font-medium text-text block truncate">{w.name}</span>
-                    <span className="text-[10px] font-mono text-muted block truncate">{w.domain}</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono text-xs">
-                    <span className="text-text font-bold tnum">{w.latestSeoScore} <span className="text-[10px] font-normal text-muted">SEO</span></span>
-                    <span className="text-text font-bold tnum">{w.latestGeoScore} <span className="text-[10px] font-normal text-muted">GEO</span></span>
+
+            {/* 2-Column Main Workspace */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column (7 cols): Prioritized Tasks & Search Opportunities */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-card rounded-xl border border-border shadow-xs p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`text-xs font-bold pb-1 transition-colors border-b-2 ${
+                          activeTab === 'tasks'
+                            ? 'border-primary text-text'
+                            : 'border-transparent text-muted hover:text-text'
+                        }`}
+                      >
+                        Prioritized Fixes ({tasks.length})
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('opportunities')}
+                        className={`text-xs font-bold pb-1 transition-colors border-b-2 ${
+                          activeTab === 'opportunities'
+                            ? 'border-primary text-text'
+                            : 'border-transparent text-muted hover:text-text'
+                        }`}
+                      >
+                        Striking Distance ({opportunities.length})
+                      </button>
+                    </div>
+
                     <Link
-                      href="/dashboard/audits"
-                      className="p-1 text-muted hover:text-text rounded-md hover:bg-slate-100"
+                      href={activeTab === 'tasks' ? '/dashboard/action-center' : '/dashboard/opportunities'}
+                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <span>View All</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
+
+                  {activeTab === 'tasks' ? (
+                    <div className="divide-y divide-border">
+                      {tasks.slice(0, 5).map((task) => (
+                        <div key={task.id} className="py-3 flex items-center justify-between gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
+                                  task.priority === 'critical'
+                                    ? 'bg-red-50 text-error border border-red-200 dark:bg-red-950/40'
+                                    : task.priority === 'high'
+                                    ? 'bg-amber-50 text-warning border border-amber-200 dark:bg-amber-950/40'
+                                    : 'bg-blue-50 text-accent border border-blue-200 dark:bg-blue-950/40'
+                                }`}
+                              >
+                                {task.priority}
+                              </span>
+                              <h4 className="text-xs font-semibold text-text truncate">{task.title}</h4>
+                            </div>
+                            <p className="text-[11px] font-mono text-muted truncate">{task.affectedUrl}</p>
+                          </div>
+
+                          <Link
+                            href={`/dashboard/action-center?task=${task.id}`}
+                            className="px-3 py-1.5 rounded-md border border-border bg-bg hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-medium text-text transition-colors shrink-0"
+                          >
+                            Execute
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {opportunities.slice(0, 5).map((opp) => (
+                        <div key={opp.id} className="py-3 flex items-center justify-between gap-4">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary-tint text-primary border border-emerald-200">
+                                Pos {opp.position?.toFixed(1) || '—'}
+                              </span>
+                              <h4 className="text-xs font-semibold text-text truncate">{opp.query}</h4>
+                            </div>
+                            <p className="text-[11px] font-mono text-muted truncate">{opp.pageUrl}</p>
+                          </div>
+
+                          <span className="text-xs font-mono font-medium text-text tnum shrink-0">
+                            {opp.impressions.toLocaleString()} impr
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              </div>
+
+              {/* Right Column (5 cols): Performance Trend & Quick Actions */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* Search Console Performance Graph */}
+                <div className="bg-card rounded-xl border border-border shadow-xs p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold text-text">Organic Visibility Trend</h3>
+                      <p className="text-[11px] text-muted">Daily Search Console impressions</p>
+                    </div>
+                    <Link
+                      href="/dashboard/gsc"
+                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                    >
+                      <span>Deep Dive</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+
+                  <div className="h-44 w-full pt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={mockGscTrends} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="gscGreen" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#059669" stopOpacity={0.25} />
+                            <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                        <RechartsTooltip
+                          contentStyle={{
+                            backgroundColor: '#FFFFFF',
+                            borderColor: '#E2E8F0',
+                            borderRadius: '8px',
+                            fontSize: '11px',
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="impressions"
+                          stroke="#059669"
+                          strokeWidth={2}
+                          fillOpacity={1}
+                          fill="url(#gscGreen)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Quick Audit Action Card */}
+                <div className="bg-card rounded-xl border border-border shadow-xs p-5 space-y-3 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-xs font-bold text-text">Audit Website Now</h3>
+                    <p className="text-[11px] text-muted">
+                      Run safe 30+ check crawler pass on {primaryWebsite?.name || 'domain'}.
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/dashboard/audits?websiteId=${primaryWebsite?.id || ''}`}
+                    className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-medium transition-colors shrink-0 shadow-xs"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Run Audit</span>
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

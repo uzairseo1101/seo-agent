@@ -234,51 +234,45 @@ export default function AuditsPage() {
         {/* Score Cards Row */}
         {latestRun && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-card p-5 rounded-lg border border-border shadow-card">
+            <div className="bg-card p-5 rounded-xl border border-border shadow-xs">
               <div className="flex items-center justify-between text-xs font-medium text-muted">
                 <span>Technical SEO Score</span>
-                <span className="text-[11px] font-mono text-primary bg-primary-tint border border-emerald-200/60 px-2 py-0.5 rounded-full">
-                  Formula
-                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">{latestRun.seoScore}</span>
-                <span className="text-xs font-mono text-muted">/ 100</span>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-3xl font-bold font-head text-text tracking-tight tnum">{latestRun.seoScore}</span>
+                <span className="text-xs text-muted">/ 100</span>
               </div>
               <p className="mt-2 text-xs text-muted">
-                Technical (45%) + Indexability (30%) + Content (25%)
+                Evaluates crawlability, canonicals, status codes & tags
               </p>
             </div>
 
-            <div className="bg-card p-5 rounded-lg border border-border shadow-card">
+            <div className="bg-card p-5 rounded-xl border border-border shadow-xs">
               <div className="flex items-center justify-between text-xs font-medium text-muted">
                 <span>GEO Visibility Score</span>
-                <span className="text-[11px] font-mono text-accent bg-accent-tint border border-blue-200/60 px-2 py-0.5 rounded-full">
-                  Entity Graph
-                </span>
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">{latestRun.geoScore}</span>
-                <span className="text-xs font-mono text-muted">/ 100</span>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-3xl font-bold font-head text-accent tracking-tight tnum">{latestRun.geoScore}</span>
+                <span className="text-xs text-muted">/ 100</span>
               </div>
               <p className="mt-2 text-xs text-muted">
-                Brand entity clarity & author citation authority
+                Brand entity clarity & Generative Engine citations
               </p>
             </div>
 
-            <div className="bg-card p-5 rounded-lg border border-border shadow-card">
+            <div className="bg-card p-5 rounded-xl border border-border shadow-xs">
               <div className="flex items-center justify-between text-xs font-medium text-muted">
                 <span>AEO Direct Answer Score</span>
-                <span className="text-[11px] font-mono text-accent bg-accent-tint border border-blue-200/60 px-2 py-0.5 rounded-full">
-                  Readiness
-                </span>
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
               </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-3xl font-bold font-mono text-text tracking-tight tnum">{latestRun.aeoScore}</span>
-                <span className="text-xs font-mono text-muted">/ 100</span>
+              <div className="mt-2.5 flex items-baseline gap-2">
+                <span className="text-3xl font-bold font-head text-text tracking-tight tnum">{latestRun.aeoScore}</span>
+                <span className="text-xs text-muted">/ 100</span>
               </div>
               <p className="mt-2 text-xs text-muted">
-                Q&A structure & direct answer summary coverage
+                Q&A structure & Answer Engine summary readiness
               </p>
             </div>
           </div>

@@ -8,21 +8,15 @@ import {
   LayoutDashboard,
   Globe,
   FileSearch,
+  CheckSquare,
   Search,
   Sparkles,
-  TrendingDown,
-  CheckSquare,
-  Bell,
   FileText,
-  ShieldCheck,
   Settings,
+  ShieldCheck,
   ShieldAlert,
-  Bot,
-  Building2,
-  ChevronDown,
-  Layers,
-  Users2,
-  LogOut
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { storage } from '@/lib/storage';
@@ -32,69 +26,21 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: number | string;
 }
 
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
+const mainNavItems: NavItem[] = [
+  { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Websites', href: '/dashboard/websites', icon: Globe },
+  { name: 'Audits & Crawler', href: '/dashboard/audits', icon: FileSearch },
+  { name: 'Action Center', href: '/dashboard/action-center', icon: CheckSquare },
+  { name: 'Search Console', href: '/dashboard/gsc', icon: Search },
+  { name: 'Opportunities', href: '/dashboard/opportunities', icon: Sparkles },
+  { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+];
 
-const navSections: NavSection[] = [
-  {
-    title: 'Overview',
-    items: [
-      { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-      { name: 'Websites', href: '/dashboard/websites', icon: Globe },
-    ],
-  },
-  {
-    title: 'Agent',
-    items: [
-      { name: 'Action Center', href: '/dashboard/action-center', icon: Bot, badge: 3 },
-      { name: 'Alerts', href: '/dashboard/alerts', icon: Bell, badge: 2 },
-    ],
-  },
-  {
-    title: 'Keywords',
-    items: [
-      { name: 'Search Console', href: '/dashboard/gsc', icon: Search },
-      { name: 'Opportunities', href: '/dashboard/opportunities', icon: Sparkles },
-      { name: 'Traffic Analysis', href: '/dashboard/traffic', icon: TrendingDown },
-    ],
-  },
-  {
-    title: 'Audits',
-    items: [
-      { name: 'Website Audits', href: '/dashboard/audits', icon: FileSearch },
-      { name: 'Trust Center', href: '/dashboard/trust-center', icon: ShieldCheck },
-    ],
-  },
-  {
-    title: 'Content',
-    items: [
-      { name: 'Content Briefs', href: '/dashboard/opportunities?tab=content', icon: FileText },
-    ],
-  },
-  {
-    title: 'Competitors',
-    items: [
-      { name: 'Competitors', href: '/dashboard/opportunities?tab=competitors', icon: Layers },
-    ],
-  },
-  {
-    title: 'Reports',
-    items: [
-      { name: 'Agency Reports', href: '/dashboard/reports', icon: FileText },
-    ],
-  },
-  {
-    title: 'Settings',
-    items: [
-      { name: 'Settings', href: '/dashboard/settings', icon: Settings },
-      { name: 'Admin Console', href: '/admin', icon: ShieldAlert },
-    ],
-  },
+const workspaceNavItems: NavItem[] = [
+  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Trust Center', href: '/dashboard/trust-center', icon: ShieldCheck },
 ];
 
 export default function DashboardSidebar() {
@@ -102,12 +48,21 @@ export default function DashboardSidebar() {
   const router = useRouter();
   const org = storage.getOrganization();
   const [userEmail, setUserEmail] = useState<string>('');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     if (supabase) {
       supabase.auth.getUser().then(({ data }) => {
         if (data?.user?.email) {
           setUserEmail(data.user.email);
+          const email = data.user.email;
+          if (
+            email === 'founder@rankpilot.ai' ||
+            email.endsWith('@uzairseo.com') ||
+            email.includes('uzairnoor')
+          ) {
+            setIsAdmin(true);
+          }
         }
       });
     }
@@ -121,97 +76,130 @@ export default function DashboardSidebar() {
   };
 
   return (
-    <aside className="w-[240px] bg-card border-r border-border flex flex-col shrink-0 min-h-screen text-text z-20">
-      {/* Brand & Organization */}
-      <div className="p-4 border-b border-border">
-        <Link href="/" className="flex items-center gap-2.5 mb-3.5 group">
-          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-white shadow-xs">
+    <aside className="w-60 bg-card border-r border-border flex flex-col shrink-0 min-h-screen text-text z-20 transition-colors">
+      {/* Brand Header */}
+      <div className="h-16 px-5 border-b border-border flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-xs group-hover:bg-primary-hover transition-colors">
             <Compass className="w-4.5 h-4.5" />
           </div>
           <span className="font-head font-bold text-base text-text tracking-tight">
             RankPilot <span className="text-primary font-semibold">AI</span>
           </span>
         </Link>
+      </div>
 
-        {/* Organization Switcher Pill */}
-        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-bg border border-border text-xs">
-          <div className="flex items-center gap-2 truncate">
-            <Building2 className="w-3.5 h-3.5 text-muted shrink-0" />
-            <span className="font-medium text-text truncate">{org.name}</span>
+      {/* Navigation Body */}
+      <div className="flex-1 px-3 py-4 space-y-6 overflow-y-auto">
+        {/* Main Section */}
+        <div className="space-y-1">
+          <div className="px-3 pb-1.5 text-[11px] font-semibold tracking-wider uppercase text-muted/70">
+            Platform
           </div>
-          <ChevronDown className="w-3.5 h-3.5 text-muted shrink-0" />
+          {mainNavItems.map((item) => {
+            const isActive =
+              item.href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname.startsWith(item.href);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-all",
+                  isActive
+                    ? "bg-primary-tint text-primary font-semibold"
+                    : "text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "w-4 h-4 shrink-0 transition-colors",
+                    isActive ? "text-primary" : "text-muted"
+                  )}
+                />
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Workspace Section */}
+        <div className="space-y-1">
+          <div className="px-3 pb-1.5 text-[11px] font-semibold tracking-wider uppercase text-muted/70">
+            Workspace
+          </div>
+          {workspaceNavItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-all",
+                  isActive
+                    ? "bg-primary-tint text-primary font-semibold"
+                    : "text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "w-4 h-4 shrink-0 transition-colors",
+                    isActive ? "text-primary" : "text-muted"
+                  )}
+                />
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-all",
+                pathname.startsWith('/admin')
+                  ? "bg-primary-tint text-primary font-semibold"
+                  : "text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              )}
+            >
+              <ShieldAlert className="w-4 h-4 shrink-0 text-accent" />
+              <span>Admin Console</span>
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Main Navigation Sections */}
-      <nav className="flex-1 px-2.5 py-3 space-y-4 overflow-y-auto">
-        {navSections.map((section) => (
-          <div key={section.title} className="space-y-0.5">
-            <div className="text-[10px] font-semibold tracking-wider uppercase text-muted px-2.5 py-1 font-sans">
-              {section.title}
+      {/* User Profile Footer */}
+      <div className="p-3 border-t border-border bg-card">
+        <div className="p-2 rounded-md bg-bg border border-border flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-primary-tint text-primary font-bold text-xs flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-900/50">
+              {userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}
             </div>
-            {section.items.map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-text truncate">
+                {userEmail ? userEmail.split('@')[0] : 'Workspace'}
+              </span>
+              <span className="text-[10px] text-muted truncate">
+                {userEmail || 'Active'}
+              </span>
+            </div>
+          </div>
 
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center justify-between px-2.5 py-2 text-sm font-medium transition-colors rounded-sm",
-                    isActive
-                      ? "bg-primary-tint text-primary font-semibold border-l-[3px] border-primary pl-2"
-                      : "text-muted hover:text-text hover:bg-slate-100/70"
-                  )}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary" : "text-muted")} />
-                    <span className="truncate">{item.name}</span>
-                  </div>
-                  {item.badge && (
-                    <span
-                      className={cn(
-                        "text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full",
-                        isActive
-                          ? "bg-primary text-white"
-                          : "bg-slate-100 text-muted border border-border"
-                      )}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      {/* Bottom Profile / Logout */}
-      <div className="p-3 border-t border-border bg-card space-y-2">
-        <div className="flex items-center gap-2.5 px-1 py-1 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-primary-tint text-primary font-semibold text-xs flex items-center justify-center shrink-0 border border-emerald-200">
-            {userEmail ? userEmail.charAt(0).toUpperCase() : 'AG'}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-semibold text-text truncate">
-              {userEmail ? userEmail.split('@')[0] : 'Agency Workspace'}
-            </span>
-            <span className="text-[10px] font-mono text-muted truncate">
-              {userEmail || 'Active Session'}
-            </span>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="p-1.5 text-muted hover:text-error hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors"
+            title="Sign Out"
+            aria-label="Sign out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
-
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-muted hover:text-error hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-          title="Sign out of RankPilot AI"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Sign Out</span>
-        </button>
       </div>
     </aside>
   );
