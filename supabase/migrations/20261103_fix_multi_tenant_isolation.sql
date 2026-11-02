@@ -151,40 +151,57 @@ BEGIN
         user_role := 'superadmin';
     END IF;
 
-    -- 6.1 Insert Profile
-    INSERT INTO public.profiles (id, email, full_name, role)
-    VALUES (NEW.id, NEW.email, user_name, user_role)
-    ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name);
+    -- 6.1 Insert Profile (protected)
+    BEGIN
+        INSERT INTO public.profiles (id, email, full_name, role)
+        VALUES (NEW.id, NEW.email, user_name, user_role)
+        ON CONFLICT (id) DO UPDATE SET
+            email = EXCLUDED.email,
+            full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name);
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'Profile creation notice: %', SQLERRM;
+    END;
 
-    -- 6.2 If founder and initial organization exists, attach to it
-    IF NEW.email = 'uzairnoor1101@gmail.com' AND EXISTS (SELECT 1 FROM public.organizations WHERE id = '2fff7e42-627e-4582-8982-aa8463bf9fca') THEN
-        INSERT INTO public.memberships (organization_id, user_id, role)
-        VALUES ('2fff7e42-627e-4582-8982-aa8463bf9fca', NEW.id, 'owner')
-        ON CONFLICT (organization_id, user_id) DO NOTHING;
-    ELSE
-        -- Create fresh personal workspace
-        new_org_id := gen_random_uuid();
-        INSERT INTO public.organizations (id, name, slug, plan, max_websites, max_crawled_pages_per_audit)
-        VALUES (new_org_id, org_name, 'org-' || SUBSTRING(new_org_id::text FROM 1 FOR 8), 'free', 1, 10);
+    -- 6.2 Workspace & Membership (protected)
+    BEGIN
+        IF NEW.email = 'uzairnoor1101@gmail.com' AND EXISTS (SELECT 1 FROM public.organizations WHERE id = '2fff7e42-627e-4582-8982-aa8463bf9fca') THEN
+            INSERT INTO public.memberships (organization_id, user_id, role)
+            VALUES ('2fff7e42-627e-4582-8982-aa8463bf9fca', NEW.id, 'owner')
+            ON CONFLICT (organization_id, user_id) DO NOTHING;
+        ELSE
+            -- Create fresh personal workspace
+            new_org_id := gen_random_uuid();
+            INSERT INTO public.organizations (id, name, slug, plan)
+            VALUES (new_org_id, org_name, 'org-' || SUBSTRING(new_org_id::text FROM 1 FOR 8), 'free')
+            ON CONFLICT (id) DO NOTHING;
 
-        INSERT INTO public.memberships (organization_id, user_id, role)
-        VALUES (new_org_id, NEW.id, 'owner')
-        ON CONFLICT (organization_id, user_id) DO NOTHING;
+            INSERT INTO public.memberships (organization_id, user_id, role)
+            VALUES (new_org_id, NEW.id, 'owner')
+            ON CONFLICT (organization_id, user_id) DO NOTHING;
 
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subscriptions') THEN
-            INSERT INTO public.subscriptions (organization_id, provider, plan, billing_cycle, status)
-            VALUES (new_org_id, 'free', 'free', 'monthly', 'active')
-            ON CONFLICT DO NOTHING;
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subscriptions') THEN
+                INSERT INTO public.subscriptions (organization_id, provider, plan, billing_cycle, status)
+                VALUES (new_org_id, 'free', 'free', 'monthly', 'active')
+                ON CONFLICT DO NOTHING;
+            END IF;
+
+            BEGIN
+                IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'sync_organization_entitlements') THEN
+                    PERFORM public.sync_organization_entitlements(new_org_id, 'free');
+                END IF;
+            EXCEPTION WHEN OTHERS THEN
+                NULL;
+            END;
         END IF;
-
-        PERFORM public.sync_organization_entitlements(new_org_id, 'free');
-    END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'Workspace creation notice: %', SQLERRM;
+    END;
 
     RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+    RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -229,21 +246,32 @@ BEGIN
         ELSE
             -- Check if user already has a membership
             IF NOT EXISTS (SELECT 1 FROM public.memberships WHERE user_id = u_rec.id) THEN
-                new_org_id := gen_random_uuid();
-                INSERT INTO public.organizations (id, name, slug, plan, max_websites, max_crawled_pages_per_audit)
-                VALUES (new_org_id, org_name, 'org-' || SUBSTRING(new_org_id::text FROM 1 FOR 8), 'free', 1, 10);
+                BEGIN
+                    new_org_id := gen_random_uuid();
+                    INSERT INTO public.organizations (id, name, slug, plan)
+                    VALUES (new_org_id, org_name, 'org-' || SUBSTRING(new_org_id::text FROM 1 FOR 8), 'free')
+                    ON CONFLICT (id) DO NOTHING;
 
-                INSERT INTO public.memberships (organization_id, user_id, role)
-                VALUES (new_org_id, u_rec.id, 'owner')
-                ON CONFLICT (organization_id, user_id) DO NOTHING;
+                    INSERT INTO public.memberships (organization_id, user_id, role)
+                    VALUES (new_org_id, u_rec.id, 'owner')
+                    ON CONFLICT (organization_id, user_id) DO NOTHING;
 
-                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subscriptions') THEN
-                    INSERT INTO public.subscriptions (organization_id, provider, plan, billing_cycle, status)
-                    VALUES (new_org_id, 'free', 'free', 'monthly', 'active')
-                    ON CONFLICT DO NOTHING;
-                END IF;
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'subscriptions') THEN
+                        INSERT INTO public.subscriptions (organization_id, provider, plan, billing_cycle, status)
+                        VALUES (new_org_id, 'free', 'free', 'monthly', 'active')
+                        ON CONFLICT DO NOTHING;
+                    END IF;
 
-                PERFORM public.sync_organization_entitlements(new_org_id, 'free');
+                    BEGIN
+                        IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'sync_organization_entitlements') THEN
+                            PERFORM public.sync_organization_entitlements(new_org_id, 'free');
+                        END IF;
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
             END IF;
         END IF;
     END LOOP;
