@@ -57,9 +57,10 @@ export default function DashboardOverviewPage() {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
 
-        const [webRes, taskRes] = await Promise.all([
+        const [webRes, taskRes, auditRes] = await Promise.all([
           fetch('/api/websites', { headers }),
           fetch('/api/tasks', { headers }),
+          fetch('/api/audits', { headers }),
         ]);
 
         if (webRes.ok && mounted) {
@@ -78,6 +79,12 @@ export default function DashboardOverviewPage() {
           const taskJson = await taskRes.json();
           if (taskJson.success && taskJson.tasks) {
             setTasks(taskJson.tasks);
+          }
+        }
+        if (auditRes.ok && mounted) {
+          const auditJson = await auditRes.json();
+          if (auditJson.success && Array.isArray(auditJson.findings) && auditJson.findings.length > 0) {
+            setFindings(auditJson.findings);
           }
         }
       } catch (e) {

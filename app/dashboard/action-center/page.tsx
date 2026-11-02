@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import DashboardHeader from '@/components/dashboard-header';
 import { storage } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 import { ActionItem, TaskPriority, TaskStatus, FindingCategory } from '@/lib/types';
 import {
   CheckSquare,
@@ -44,12 +45,20 @@ export default function ActionCenterPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
-  // Sync tasks on mount from database API
+  // Sync tasks on mount & tab focus from database API
   React.useEffect(() => {
     let mounted = true;
     const fetchTasks = async () => {
       try {
-        const res = await fetch('/api/tasks');
+        const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+        const activeWebId = typeof window !== 'undefined' ? localStorage.getItem('rankpilot_active_website_id') : null;
+        const url = activeWebId ? `/api/tasks?websiteId=${activeWebId}` : '/api/tasks';
+
+        const res = await fetch(url, { headers });
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.tasks && mounted) {
@@ -103,9 +112,14 @@ export default function ActionCenterPage() {
     setTasks(prev => prev.map(t => (t.id === id ? { ...t, status: newStatus } : t)));
 
     try {
+      const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
       await fetch('/api/tasks', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ id, status: newStatus }),
       });
     } catch (e) {
@@ -118,9 +132,15 @@ export default function ActionCenterPage() {
     setVerificationFeedback(null);
 
     try {
+      const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch('/api/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ taskId }),
       });
 
@@ -129,7 +149,17 @@ export default function ActionCenterPage() {
         throw new Error(data.error || 'Verification re-check failed.');
       }
 
-      setTasks([...storage.getActionItems()]);
+      setTasks(prev => prev.map(t => {
+        if (t.id === taskId) {
+          return {
+            ...t,
+            status: 'completed',
+            verificationStatus: data.result.outcome,
+          };
+        }
+        return t;
+      }));
+
       setVerificationFeedback({
         taskId,
         outcome: data.result.outcome,
@@ -147,25 +177,37 @@ export default function ActionCenterPage() {
     e.preventDefault();
     if (!newTitle.trim() || !newUrl.trim()) return;
 
-    const res = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: newTitle,
-        affectedUrl: newUrl,
-        category: newCategory,
-        priority: newPriority,
-        dueDate: newDueDate,
-      }),
-    });
+    try {
+      const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+      const activeWebId = typeof window !== 'undefined' ? localStorage.getItem('rankpilot_active_website_id') : undefined;
 
-    const data = await res.json();
-    if (data.success && data.task) {
-      setTasks(prev => [data.task, ...prev]);
-      setIsNewTaskModalOpen(false);
-      setNewTitle('');
-      setNewUrl('');
-      setNewDueDate('');
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          title: newTitle,
+          affectedUrl: newUrl,
+          category: newCategory,
+          priority: newPriority,
+          dueDate: newDueDate,
+          websiteId: activeWebId,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.task) {
+        setTasks(prev => [data.task, ...prev]);
+        setIsNewTaskModalOpen(false);
+        setNewTitle('');
+        setNewUrl('');
+        setNewDueDate('');
+      }
+    } catch (err) {
+      console.error('Task creation failed:', err);
     }
   };
 

@@ -1,6 +1,7 @@
 import { createAdminClient, createServerClient, getSupabaseServerClient, isServerSupabaseConfigured } from '@/lib/supabase-server';
 import { storage } from '@/lib/storage';
 import { NextRequest } from 'next/server';
+import { generateUuid, isValidUuid } from '@/lib/utils';
 import {
   Website,
   AuditRun,
@@ -11,11 +12,6 @@ import {
   FindingCategory,
   TaskPriority,
 } from '@/lib/types';
-
-function isValidUuid(id?: string): boolean {
-  if (!id) return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-}
 
 /**
  * Unified Database Access Layer.
@@ -251,17 +247,17 @@ class DatabaseService {
   // ==========================================
   // AUDITS & FINDINGS
   // ==========================================
-  async getAuditRuns(websiteId?: string): Promise<AuditRun[]> {
-    const client = this.getClient();
+  async getAuditRuns(websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditRun[]> {
+    const client = this.getClient(req);
     if (client) {
       try {
         let query = client.from('audit_runs').select('*').order('started_at', { ascending: false });
-        if (websiteId) {
+        if (websiteId && isValidUuid(websiteId)) {
           query = query.eq('website_id', websiteId);
         }
         const { data, error } = await query;
-        if (!error && data) {
-          return data.map((row: any) => ({
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const mappedRuns = data.map((row: any) => ({
             id: row.id,
             websiteId: row.website_id,
             status: row.status || 'completed',
@@ -279,6 +275,13 @@ class DatabaseService {
               low: 0,
             },
           }));
+
+          // Sync into memory storage
+          mappedRuns.forEach((r) => {
+            storage.saveAuditRun(r, []);
+          });
+
+          return mappedRuns;
         }
       } catch (e) {
         console.error('Database getAuditRuns fallback:', e);
@@ -287,14 +290,56 @@ class DatabaseService {
     return storage.getAuditRuns(websiteId);
   }
 
-  async saveAuditRun(run: AuditRun, findings: AuditFinding[]): Promise<void> {
-    storage.saveAuditRun(run, findings);
-
-    const client = this.getClient();
+  async getFindings(runId?: string, websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditFinding[]> {
+    const client = this.getClient(req);
     if (client) {
       try {
+        let query = client.from('audit_findings').select('*').order('created_at', { ascending: false });
+        if (runId && isValidUuid(runId)) {
+          query = query.eq('audit_run_id', runId);
+        }
+        if (websiteId && isValidUuid(websiteId)) {
+          query = query.eq('website_id', websiteId);
+        }
+        const { data, error } = await query;
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return data.map((row: any) => ({
+            id: row.id,
+            auditRunId: row.audit_run_id,
+            websiteId: row.website_id,
+            url: row.url,
+            category: row.category as FindingCategory,
+            issueType: row.issue_type,
+            severity: row.severity,
+            title: row.title,
+            description: row.description,
+            recommendation: row.recommendation,
+            confidenceLevel: row.confidence_level || 'high',
+            detectionMethod: row.detection_method,
+            evidence: {
+              expected: row.expected_condition || row.recommendation || 'Compliant with search standards',
+              actual: row.actual_condition || row.description || 'Defect detected during crawl',
+            },
+            isResolved: row.is_resolved || false,
+            createdAt: row.created_at || new Date().toISOString(),
+          }));
+        }
+      } catch (e) {
+        console.error('Database getFindings fallback:', e);
+      }
+    }
+    return storage.getFindings(runId);
+  }
+
+  async saveAuditRun(run: AuditRun, findings: AuditFinding[], req?: NextRequest | Headers | null): Promise<void> {
+    storage.saveAuditRun(run, findings);
+
+    const client = this.getClient(req);
+    if (client) {
+      try {
+        const runId = isValidUuid(run.id) ? run.id : generateUuid();
         await client.from('audit_runs').insert({
-          id: run.id,
+          id: runId,
           website_id: run.websiteId,
           status: run.status,
           pages_crawled: run.pagesCrawled,
@@ -315,8 +360,8 @@ class DatabaseService {
 
         if (findings.length > 0) {
           const findingRows = findings.map(f => ({
-            id: f.id,
-            audit_run_id: run.id,
+            id: isValidUuid(f.id) ? f.id : generateUuid(),
+            audit_run_id: runId,
             website_id: run.websiteId,
             url: f.url,
             category: f.category,
@@ -340,23 +385,23 @@ class DatabaseService {
       websiteId: run.websiteId,
       seoScore: run.seoScore,
       findingsCount: findings.length,
-    });
+    }, req);
   }
 
   // ==========================================
   // ACTION ITEMS / TASKS
   // ==========================================
-  async getActionItems(websiteId?: string): Promise<ActionItem[]> {
-    const client = this.getClient();
+  async getActionItems(websiteId?: string, req?: NextRequest | Headers | null): Promise<ActionItem[]> {
+    const client = this.getClient(req);
     if (client) {
       try {
         let query = client.from('action_items').select('*').order('created_at', { ascending: false });
-        if (websiteId) {
+        if (websiteId && isValidUuid(websiteId)) {
           query = query.eq('website_id', websiteId);
         }
         const { data, error } = await query;
-        if (!error && data) {
-          return data.map((row: any) => ({
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const mappedTasks = data.map((row: any) => ({
             id: row.id,
             organizationId: row.organization_id,
             websiteId: row.website_id,
@@ -376,6 +421,13 @@ class DatabaseService {
             userNotes: row.user_notes || undefined,
             createdAt: row.created_at || new Date().toISOString(),
           }));
+
+          // Sync into memory storage
+          mappedTasks.forEach((t) => {
+            storage.addActionItem(t);
+          });
+
+          return mappedTasks;
         }
       } catch (e) {
         console.error('Database getActionItems fallback:', e);
@@ -384,8 +436,72 @@ class DatabaseService {
     return storage.getActionItems(websiteId);
   }
 
-  async updateActionItemStatus(id: string, status: TaskStatus, notes?: string): Promise<ActionItem | null> {
-    const client = this.getClient();
+  async createActionItem(item: Partial<ActionItem>, req?: NextRequest | Headers | null): Promise<ActionItem> {
+    const taskId = (item.id && isValidUuid(item.id)) ? item.id : generateUuid();
+    const client = this.getClient(req);
+    let organizationId = item.organizationId;
+
+    if (client) {
+      try {
+        if (!organizationId || !isValidUuid(organizationId)) {
+          organizationId = await this.getOrCreateDefaultOrganization(client);
+        }
+
+        const taskRow = {
+          id: taskId,
+          organization_id: organizationId,
+          website_id: item.websiteId,
+          source_type: item.sourceType || 'manual',
+          source_id: (item.sourceId && isValidUuid(item.sourceId)) ? item.sourceId : null,
+          title: item.title || 'Untitled Action Item',
+          description: item.description || item.title || '',
+          category: (item.category as FindingCategory) || 'technical',
+          priority: (item.priority as TaskPriority) || 'medium',
+          affected_url: item.affectedUrl || '',
+          recommended_solution: item.recommendedSolution || 'Implement optimization.',
+          step_by_step_instructions: item.steps || [],
+          status: item.status || 'todo',
+          verification_status: item.verificationStatus === 'completed_verified' ? 'verified' : (item.verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified'),
+          due_date: item.dueDate || null,
+          created_at: item.createdAt || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await client.from('action_items').insert(taskRow);
+        if (error) {
+          console.error('Database createActionItem error:', error);
+        }
+      } catch (e) {
+        console.error('Database createActionItem fallback:', e);
+      }
+    }
+
+    const newTask: ActionItem = {
+      id: taskId,
+      organizationId: organizationId || '00000000-0000-0000-0000-000000000001',
+      websiteId: item.websiteId || '',
+      sourceType: item.sourceType || 'manual',
+      sourceId: item.sourceId,
+      title: item.title || 'Untitled Action Item',
+      description: item.description || item.title || '',
+      category: (item.category as FindingCategory) || 'technical',
+      priority: (item.priority as TaskPriority) || 'medium',
+      affectedUrl: item.affectedUrl || '',
+      recommendedSolution: item.recommendedSolution || '',
+      steps: item.steps || [],
+      status: item.status || 'todo',
+      verificationStatus: item.verificationStatus || 'unverified',
+      dueDate: item.dueDate,
+      createdAt: item.createdAt || new Date().toISOString(),
+    };
+
+    storage.addActionItem(newTask);
+    await this.logActivity('task_created', 'action_item', newTask.id, { title: newTask.title }, req);
+    return newTask;
+  }
+
+  async updateActionItemStatus(id: string, status: TaskStatus, notes?: string, req?: NextRequest | Headers | null): Promise<ActionItem | null> {
+    const client = this.getClient(req);
     if (client) {
       try {
         const updates: any = {
@@ -407,7 +523,7 @@ class DatabaseService {
     if (updated && notes !== undefined) {
       updated.userNotes = notes;
     }
-    await this.logActivity('task_status_updated', 'action_item', id, { status });
+    await this.logActivity('task_status_updated', 'action_item', id, { status }, req);
     return updated || null;
   }
 

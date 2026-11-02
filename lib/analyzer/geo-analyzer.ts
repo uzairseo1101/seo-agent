@@ -1,5 +1,6 @@
 import { CrawledPageData } from '../crawler/crawler';
 import { AuditFinding } from '../types';
+import { generateUuid } from '../utils';
 
 export interface GeoAnalysisResult {
   score: number;
@@ -35,7 +36,7 @@ export function analyzeGeoSignals(
   if (!hasOrgSchema) {
     scorePoints -= 25;
     findings.push({
-      id: `fnd-geo-org-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,
@@ -81,7 +82,7 @@ export function analyzeGeoSignals(
     if (!hasAuthorEntity) {
       scorePoints -= 20;
       findings.push({
-        id: `fnd-geo-aut-${Date.now()}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url: blogOrArticlePages[0].url,
@@ -103,7 +104,7 @@ export function analyzeGeoSignals(
     } else if (!hasAuthorCredentials) {
       scorePoints -= 10;
       findings.push({
-        id: `fnd-geo-crd-${Date.now()}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url: blogOrArticlePages[0].url,
@@ -135,7 +136,7 @@ export function analyzeGeoSignals(
   if (!hasOutboundCitations && pages.length >= 3) {
     scorePoints -= 15;
     findings.push({
-      id: `fnd-geo-cit-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,
@@ -164,7 +165,7 @@ export function analyzeGeoSignals(
   if (!hasContactOrAbout && pages.length >= 3) {
     scorePoints -= 15;
     findings.push({
-      id: `fnd-geo-abt-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,

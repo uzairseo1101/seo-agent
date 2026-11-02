@@ -1,5 +1,6 @@
 import { CrawledPageData, CrawlResult } from '../crawler/crawler';
 import { AuditFinding, FindingSeverity } from '../types';
+import { generateUuid } from '../utils';
 
 export function analyzeTechnicalSeo(
   crawlResult: CrawlResult,
@@ -17,7 +18,7 @@ export function analyzeTechnicalSeo(
   // Global Check 1: Robots.txt
   if (!robotsTxt.accessible) {
     findings.push({
-      id: `fnd-rob-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,
@@ -41,7 +42,7 @@ export function analyzeTechnicalSeo(
   // Global Check 2: Sitemap
   if (!sitemap.accessible) {
     findings.push({
-      id: `fnd-smp-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,
@@ -69,7 +70,7 @@ export function analyzeTechnicalSeo(
     // Check: HTTP Status Code
     if (statusCode >= 400) {
       findings.push({
-        id: `fnd-st-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -95,7 +96,7 @@ export function analyzeTechnicalSeo(
     // Check: Missing or Empty Title
     if (!title) {
       findings.push({
-        id: `fnd-tit-0-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -118,7 +119,7 @@ export function analyzeTechnicalSeo(
       // Title Length Heuristics
       if (title.length > 65) {
         findings.push({
-          id: `fnd-tit-l-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: generateUuid(),
           auditRunId,
           websiteId,
           url,
@@ -140,7 +141,7 @@ export function analyzeTechnicalSeo(
         });
       } else if (title.length < 25) {
         findings.push({
-          id: `fnd-tit-s-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: generateUuid(),
           auditRunId,
           websiteId,
           url,
@@ -171,7 +172,7 @@ export function analyzeTechnicalSeo(
     // Check: Meta Description
     if (!metaDescription) {
       findings.push({
-        id: `fnd-mde-0-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -192,7 +193,7 @@ export function analyzeTechnicalSeo(
       });
     } else if (metaDescription.length < 50 || metaDescription.length > 165) {
       findings.push({
-        id: `fnd-mde-l-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -217,7 +218,7 @@ export function analyzeTechnicalSeo(
     // Check: Heading Structure (H1)
     if (h1Elements.length === 0) {
       findings.push({
-        id: `fnd-h1-0-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -238,7 +239,7 @@ export function analyzeTechnicalSeo(
       });
     } else if (h1Elements.length > 1) {
       findings.push({
-        id: `fnd-h1-m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -262,7 +263,7 @@ export function analyzeTechnicalSeo(
     // Check: Canonical Tag
     if (!canonicalUrl) {
       findings.push({
-        id: `fnd-can-0-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -286,7 +287,7 @@ export function analyzeTechnicalSeo(
     // Check: Meta Robots (Noindex)
     if (metaRobots && /noindex/i.test(metaRobots)) {
       findings.push({
-        id: `fnd-noi-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -311,7 +312,7 @@ export function analyzeTechnicalSeo(
     // Check: Mobile Viewport
     if (!hasMobileViewport) {
       findings.push({
-        id: `fnd-mob-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -336,7 +337,7 @@ export function analyzeTechnicalSeo(
     const missingAltImages = images.filter(img => !img.alt || img.alt.trim() === '');
     if (missingAltImages.length > 0) {
       findings.push({
-        id: `fnd-alt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -361,7 +362,7 @@ export function analyzeTechnicalSeo(
     // Check: Open Graph Tags
     if (!openGraph.title || !openGraph.description) {
       findings.push({
-        id: `fnd-og-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url,
@@ -387,7 +388,7 @@ export function analyzeTechnicalSeo(
   for (const [title, urls] of titleMap.entries()) {
     if (urls.length > 1) {
       findings.push({
-        id: `fnd-dup-t-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: generateUuid(),
         auditRunId,
         websiteId,
         url: urls[0],

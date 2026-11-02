@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       auditRun: result.auditRun,
+      findings: result.findings,
       findingsCount: result.findings.length,
       scores: {
         seo: result.auditRun.seoScore,

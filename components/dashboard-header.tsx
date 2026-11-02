@@ -23,7 +23,13 @@ export default function DashboardHeader({
         !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
     );
   });
-  const [selectedWeb, setSelectedWeb] = useState(websites[0]?.id || '');
+  const [selectedWeb, setSelectedWeb] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('rankpilot_active_website_id');
+      if (saved) return saved;
+    }
+    return websites[0]?.id || '';
+  });
   const notifications = storage.getNotifications();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const [isDark, setIsDark] = useState(false);
@@ -59,8 +65,15 @@ export default function DashboardHeader({
                 !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
             );
             setWebsites(clean);
-            if (clean.length > 0 && !selectedWeb) {
-              setSelectedWeb(clean[0].id);
+            if (clean.length > 0) {
+              const current = selectedWeb || (typeof window !== 'undefined' ? localStorage.getItem('rankpilot_active_website_id') : null);
+              if (!current || !clean.some((w: Website) => w.id === current)) {
+                const firstId = clean[0].id;
+                setSelectedWeb(firstId);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('rankpilot_active_website_id', firstId);
+                }
+              }
             }
           }
         }
@@ -102,7 +115,14 @@ export default function DashboardHeader({
             <Globe className="w-3.5 h-3.5 text-muted shrink-0" />
             <select
               value={selectedWeb}
-              onChange={(e) => setSelectedWeb(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedWeb(val);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('rankpilot_active_website_id', val);
+                  window.dispatchEvent(new CustomEvent('rankpilot-website-changed', { detail: { websiteId: val } }));
+                }
+              }}
               className="bg-transparent border-none outline-none font-medium cursor-pointer text-text"
             >
               {websites.map((w) => (

@@ -1,5 +1,6 @@
 import { CrawledPageData } from '../crawler/crawler';
 import { AuditFinding } from '../types';
+import { generateUuid } from '../utils';
 
 export interface AeoAnalysisResult {
   score: number;
@@ -40,7 +41,7 @@ export function analyzeAeoSignals(
   if (totalQuestionHeadings === 0 && pages.length >= 2) {
     scorePoints -= 25;
     findings.push({
-      id: `fnd-aeo-qhd-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,
@@ -70,7 +71,7 @@ export function analyzeAeoSignals(
   if (hasFaqPage && !hasFaqSchema) {
     scorePoints -= 25;
     findings.push({
-      id: `fnd-aeo-faq-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: pages.find(p => p.url.includes('/faq'))?.url || fallbackUrl,
@@ -92,7 +93,7 @@ export function analyzeAeoSignals(
   } else if (!hasFaqSchema && !hasFaqPage && pages.length >= 4) {
     scorePoints -= 15;
     findings.push({
-      id: `fnd-aeo-no-faq-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,
@@ -126,7 +127,7 @@ export function analyzeAeoSignals(
   if (!hasConciseSummaries && pages.length >= 2) {
     scorePoints -= 15;
     findings.push({
-      id: `fnd-aeo-ans-${Date.now()}`,
+      id: generateUuid(),
       auditRunId,
       websiteId,
       url: fallbackUrl,

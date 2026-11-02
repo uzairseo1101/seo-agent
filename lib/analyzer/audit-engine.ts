@@ -4,6 +4,7 @@ import { analyzeGeoSignals } from './geo-analyzer';
 import { analyzeAeoSignals } from './aeo-analyzer';
 import { calculateAuditScores, ScoreBreakdown } from './scoring';
 import { storage } from '../storage';
+import { db } from '../db';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { AuditRun, AuditFinding } from '../types';
 
@@ -121,61 +122,39 @@ export async function executeWebsiteAudit(
     findingsCount,
   };
 
-  // 8. Update storage with audit run, findings, and website scores
-  storage.saveAuditRun(auditRun, allFindings);
+  // 8. Persist audit run, findings, and website scores to Supabase & storage
+  await db.saveAuditRun(auditRun, allFindings);
 
-  // If Supabase is configured, also persist audit run and findings to PostgreSQL
-  if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('audit_runs').insert({
-        id: auditRun.id,
-        website_id: websiteId,
-        status: auditRun.status,
-        pages_crawled: auditRun.pagesCrawled,
-        seo_score: auditRun.seoScore,
-        geo_score: auditRun.geoScore,
-        aeo_score: auditRun.aeoScore,
-        crawl_duration_ms: auditRun.crawlDurationMs,
-        started_at: auditRun.startedAt,
-        completed_at: auditRun.completedAt,
-      });
-
-      await supabase.from('websites').update({
-        latest_seo_score: auditRun.seoScore,
-        latest_geo_score: auditRun.geoScore,
-        latest_aeo_score: auditRun.aeoScore,
-        last_audited_at: auditRun.completedAt,
-      }).eq('id', websiteId);
-
-      if (allFindings.length > 0) {
-        const findingRows = allFindings.map(f => ({
-          id: f.id,
-          audit_run_id: auditRun.id,
-          website_id: websiteId,
-          url: f.url,
-          category: f.category,
-          issue_type: f.issueType,
-          severity: f.severity,
-          title: f.title,
-          description: f.description,
-          recommendation: f.recommendation,
-          confidence_level: f.confidenceLevel,
-          detection_method: f.detectionMethod,
-          is_resolved: f.isResolved,
-        }));
-        await supabase.from('audit_findings').insert(findingRows);
-      }
-    } catch (err) {
-      console.error('Supabase audit persistence error:', err);
-    }
-  }
-
-  // 9. Automatically convert Critical and High findings into Action Center tasks
+  // 9. Automatically convert Critical and High findings into Action Center tasks in Supabase
   let tasksCreatedCount = 0;
   for (const finding of allFindings) {
     if (finding.severity === 'critical' || finding.severity === 'high') {
       const task = storage.createActionItemFromFinding(finding.id);
-      if (task) tasksCreatedCount++;
+      if (task) {
+        tasksCreatedCount++;
+        try {
+          await db.createActionItem({
+            id: task.id,
+            organizationId: website.organizationId,
+            websiteId: website.id,
+            sourceType: 'audit_finding',
+            sourceId: finding.id,
+            title: task.title,
+            description: task.description,
+            category: task.category,
+            priority: task.priority,
+            affectedUrl: task.affectedUrl,
+            recommendedSolution: task.recommendedSolution,
+            steps: task.steps,
+            status: task.status,
+            verificationStatus: task.verificationStatus,
+            dueDate: task.dueDate,
+            createdAt: task.createdAt,
+          });
+        } catch (e) {
+          console.error('Failed to persist action item to DB:', e);
+        }
+      }
     }
   }
 

@@ -5,7 +5,7 @@ import { ActionItem, TaskPriority, TaskStatus, FindingCategory } from '@/lib/typ
 
 export async function GET(req: NextRequest) {
   const websiteId = req.nextUrl.searchParams.get('websiteId') || undefined;
-  const tasks = await db.getActionItems(websiteId);
+  const tasks = await db.getActionItems(websiteId, req);
   return NextResponse.json({ success: true, tasks });
 }
 
@@ -19,11 +19,10 @@ export async function POST(req: NextRequest) {
     }
 
     const org = storage.getOrganization();
-    const websites = await db.getWebsites();
-    const targetWebId = websiteId || websites[0]?.id || 'web-1';
+    const websites = await db.getWebsites(req);
+    const targetWebId = websiteId || websites[0]?.id || '00000000-0000-0000-0000-000000000001';
 
-    const newTask: ActionItem = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `act-manual-${Date.now()}`,
+    const newTask = await db.createActionItem({
       organizationId: org.id,
       websiteId: targetWebId,
       sourceType: 'manual',
@@ -43,10 +42,7 @@ export async function POST(req: NextRequest) {
       verificationStatus: 'unverified',
       dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
-    };
-
-    storage.addActionItem(newTask);
-    await db.logActivity('task_created', 'action_item', newTask.id, { title: newTask.title });
+    }, req);
 
     return NextResponse.json({ success: true, task: newTask });
   } catch (err: any) {
@@ -63,7 +59,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Task ID is required.' }, { status: 400 });
     }
 
-    const task = await db.updateActionItemStatus(id, status as TaskStatus, userNotes);
+    const task = await db.updateActionItemStatus(id, status as TaskStatus, userNotes, req);
     if (!task) {
       return NextResponse.json({ success: false, error: 'Task not found.' }, { status: 404 });
     }

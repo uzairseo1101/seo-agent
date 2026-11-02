@@ -37,7 +37,13 @@ export default function AuditsPage() {
         !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
     );
   });
-  const [selectedWebsiteId, setSelectedWebsiteId] = useState(websites[0]?.id || '');
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('rankpilot_active_website_id');
+      if (saved) return saved;
+    }
+    return '';
+  });
   const [auditRuns, setAuditRuns] = useState<AuditRun[]>([]);
   const [findings, setFindings] = useState<AuditFinding[]>([]);
 
@@ -75,8 +81,13 @@ export default function AuditsPage() {
             );
             setWebsites(cleanWebsites);
             if (cleanWebsites.length > 0) {
-              if (!selectedWebsiteId || !cleanWebsites.some((w: Website) => w.id === selectedWebsiteId)) {
-                setSelectedWebsiteId(cleanWebsites[0].id);
+              const currentId = selectedWebsiteId || (typeof window !== 'undefined' ? localStorage.getItem('rankpilot_active_website_id') : null);
+              if (!currentId || !cleanWebsites.some((w: Website) => w.id === currentId)) {
+                const firstId = cleanWebsites[0].id;
+                setSelectedWebsiteId(firstId);
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('rankpilot_active_website_id', firstId);
+                }
               }
             } else {
               setSelectedWebsiteId('');
@@ -88,6 +99,53 @@ export default function AuditsPage() {
       }
     };
     fetchWebsites();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedWebsiteId]);
+
+  // Sync audits and findings whenever selectedWebsiteId changes
+  React.useEffect(() => {
+    let mounted = true;
+    if (!selectedWebsiteId) {
+      setAuditRuns([]);
+      setFindings([]);
+      return;
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rankpilot_active_website_id', selectedWebsiteId);
+    }
+
+    const fetchAudits = async () => {
+      try {
+        const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+        const headers: Record<string, string> = {};
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+
+        const res = await fetch(`/api/audits?websiteId=${selectedWebsiteId}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && mounted) {
+            if (Array.isArray(data.auditRuns)) {
+              setAuditRuns(data.auditRuns);
+            }
+            if (Array.isArray(data.findings)) {
+              setFindings(data.findings);
+            }
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          setAuditRuns(storage.getAuditRuns(selectedWebsiteId));
+          setFindings(storage.getFindings());
+        }
+      }
+    };
+
+    fetchAudits();
     return () => {
       mounted = false;
     };
@@ -109,9 +167,15 @@ export default function AuditsPage() {
       setTimeout(() => setAuditProgressStep('Running 30+ Technical SEO checks...'), 1400);
       setTimeout(() => setAuditProgressStep('Calculating GEO authority & AEO answer readiness...'), 1900);
 
+      const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const res = await fetch('/api/audits/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           websiteId: selectedWebsiteId,
           url: selectedWebsite?.url,
@@ -128,8 +192,17 @@ export default function AuditsPage() {
         throw new Error(data.error || 'Audit execution failed.');
       }
 
-      setAuditRuns([...storage.getAuditRuns()]);
-      setFindings([...storage.getFindings()]);
+      if (data.auditRun) {
+        setAuditRuns(prev => [data.auditRun, ...prev.filter(r => r.id !== data.auditRun.id)]);
+      }
+      if (Array.isArray(data.findings)) {
+        setFindings(data.findings);
+        storage.saveAuditRun(data.auditRun, data.findings);
+      } else {
+        setAuditRuns([...storage.getAuditRuns()]);
+        setFindings([...storage.getFindings()]);
+      }
+
       setIsTriggerModalOpen(false);
       setIsAuditing(false);
     } catch (err: any) {
@@ -138,7 +211,44 @@ export default function AuditsPage() {
     }
   };
 
-  const handleCreateTask = (findingId: string) => {
+  const handleCreateTask = async (findingId: string) => {
+    const finding = findings.find(f => f.id === findingId);
+    if (!finding) return;
+
+    try {
+      const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          title: finding.title,
+          description: finding.description,
+          category: finding.category,
+          priority: finding.severity === 'critical' ? 'critical' : (finding.severity === 'high' ? 'high' : 'medium'),
+          affectedUrl: finding.url,
+          recommendedSolution: finding.recommendation,
+          websiteId: selectedWebsiteId,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.task) {
+          storage.addActionItem(data.task);
+          setTaskAddedNotice(`Action Task created: "${data.task.title}"`);
+          setTimeout(() => setTaskAddedNotice(null), 3500);
+          return;
+        }
+      }
+    } catch {
+      // Fallback to client storage
+    }
+
     const newTask = storage.createActionItemFromFinding(findingId);
     if (newTask) {
       setTaskAddedNotice(`Action Task created: "${newTask.title}"`);
