@@ -55,6 +55,27 @@ export default function SignUpPage() {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+          },
+        });
+        if (error) throw error;
+      } else {
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Google sign-up encountered an issue.');
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <head>
@@ -179,8 +200,9 @@ export default function SignUpPage() {
               <div className="pt-1">
                 <button
                   type="button"
-                  onClick={() => router.push('/dashboard')}
-                  className="w-full h-10 px-4 bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text border border-border text-xs font-medium rounded-md shadow-xs flex items-center justify-center gap-2 transition-colors"
+                  onClick={handleGoogleSignUp}
+                  disabled={loading}
+                  className="w-full h-10 px-4 bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text border border-border text-xs font-medium rounded-md shadow-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path

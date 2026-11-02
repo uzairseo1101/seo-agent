@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Compass,
   LayoutDashboard,
@@ -21,10 +21,12 @@ import {
   Building2,
   ChevronDown,
   Layers,
-  Users2
+  Users2,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { storage } from '@/lib/storage';
+import { supabase } from '@/lib/supabase';
 
 interface NavItem {
   name: string;
@@ -97,7 +99,26 @@ const navSections: NavSection[] = [
 
 export default function DashboardSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const org = storage.getOrganization();
+  const [userEmail, setUserEmail] = useState<string>('');
+
+  useEffect(() => {
+    if (supabase) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user?.email) {
+          setUserEmail(data.user.email);
+        }
+      });
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    router.push('/signin');
+  };
 
   return (
     <aside className="w-[240px] bg-card border-r border-border flex flex-col shrink-0 min-h-screen text-text z-20">
@@ -167,17 +188,30 @@ export default function DashboardSidebar() {
         ))}
       </nav>
 
-      {/* Bottom Profile / Quick Info */}
-      <div className="p-3 border-t border-border bg-card">
-        <div className="flex items-center gap-2.5 px-1 py-1">
-          <div className="w-7 h-7 rounded-full bg-accent-tint text-accent font-semibold text-xs flex items-center justify-center shrink-0 border border-blue-200">
-            AG
+      {/* Bottom Profile / Logout */}
+      <div className="p-3 border-t border-border bg-card space-y-2">
+        <div className="flex items-center gap-2.5 px-1 py-1 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-primary-tint text-primary font-semibold text-xs flex items-center justify-center shrink-0 border border-emerald-200">
+            {userEmail ? userEmail.charAt(0).toUpperCase() : 'AG'}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-xs font-semibold text-text truncate">Agency Workspace</span>
-            <span className="text-[10px] font-mono text-muted truncate">Local Dev Active</span>
+            <span className="text-xs font-semibold text-text truncate">
+              {userEmail ? userEmail.split('@')[0] : 'Agency Workspace'}
+            </span>
+            <span className="text-[10px] font-mono text-muted truncate">
+              {userEmail || 'Active Session'}
+            </span>
           </div>
         </div>
+
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-muted hover:text-error hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+          title="Sign out of RankPilot AI"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   );

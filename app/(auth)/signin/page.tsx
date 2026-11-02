@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -17,11 +17,22 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export default function SignInPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('founder@rankpilot.ai');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [redirectPath, setRedirectPath] = useState('/dashboard');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect) {
+        setRedirectPath(redirect);
+      }
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,10 +47,31 @@ export default function SignInPage() {
         });
         if (authError) throw authError;
       }
-      // Successful authentication -> redirect to dashboard
-      router.push('/dashboard');
+      // Successful authentication -> redirect to dashboard or requested page
+      router.push(redirectPath);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
+          },
+        });
+        if (error) throw error;
+      } else {
+        router.push(redirectPath);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in encountered an issue.');
       setLoading(false);
     }
   };
@@ -88,6 +120,7 @@ export default function SignInPage() {
                   <input
                     type="email"
                     required
+                    placeholder="name@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full text-xs px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -107,6 +140,7 @@ export default function SignInPage() {
                     <input
                       type={showPassword ? 'text' : 'password'}
                       required
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full text-xs px-3 pr-10 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
@@ -137,8 +171,9 @@ export default function SignInPage() {
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={() => router.push('/dashboard')}
-                  className="w-full h-10 px-4 bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text border border-border text-xs font-medium rounded-md shadow-xs flex items-center justify-center gap-2 transition-colors"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  className="w-full h-10 px-4 bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text border border-border text-xs font-medium rounded-md shadow-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
