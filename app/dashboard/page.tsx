@@ -4,10 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard-header';
-import { storage } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { Website, AuditFinding, SeoOpportunity, ActionItem } from '@/lib/types';
-import { mockGscTrends } from '@/lib/mock-data';
 import {
   Globe,
   Sparkles,
@@ -22,31 +20,19 @@ import {
   Plus,
   Play,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Loader2
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer
-} from 'recharts';
 
 export default function DashboardOverviewPage() {
   const router = useRouter();
-  const [websites, setWebsites] = useState<Website[]>(() => {
-    return storage.getWebsites().filter(
-      (w) =>
-        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
-        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
-    );
-  });
-  const [findings, setFindings] = useState<AuditFinding[]>(storage.getFindings());
-  const [opportunities, setOpportunities] = useState<SeoOpportunity[]>(storage.getOpportunities());
-  const [tasks, setTasks] = useState<ActionItem[]>(storage.getActionItems());
+  const [websites, setWebsites] = useState<Website[]>([]);
+  const [findings, setFindings] = useState<AuditFinding[]>([]);
+  const [opportunities, setOpportunities] = useState<SeoOpportunity[]>([]);
+  const [tasks, setTasks] = useState<ActionItem[]>([]);
   const [activeTab, setActiveTab] = useState<'tasks' | 'opportunities'>('tasks');
   const [showChecklist, setShowChecklist] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -92,22 +78,29 @@ export default function DashboardOverviewPage() {
             setWebsites(clean);
           }
         }
+
         if (taskRes.ok && mounted) {
           const taskJson = await taskRes.json();
-          if (taskJson.success && taskJson.tasks) {
+          if (taskJson.success && Array.isArray(taskJson.tasks)) {
             setTasks(taskJson.tasks);
           }
         }
+
         if (auditRes.ok && mounted) {
           const auditJson = await auditRes.json();
-          if (auditJson.success && Array.isArray(auditJson.findings) && auditJson.findings.length > 0) {
+          if (auditJson.success && Array.isArray(auditJson.findings)) {
             setFindings(auditJson.findings);
           }
         }
       } catch (e) {
-        // Fallback
+        console.error('Dashboard data sync error:', e);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
+
     syncData();
     return () => {
       mounted = false;
@@ -118,35 +111,57 @@ export default function DashboardOverviewPage() {
   const pendingTasks = tasks.filter((t) => t.status !== 'completed');
   const verifiedTasks = tasks.filter((t) => t.verificationStatus === 'completed_verified');
 
+  const hasAudited = primaryWebsite && (primaryWebsite.latestSeoScore > 0 || findings.length > 0);
+
   return (
     <div className="space-y-6">
       <DashboardHeader
         title="Dashboard"
-        subtitle={primaryWebsite ? `Monitoring ${primaryWebsite.name} (${primaryWebsite.domain})` : 'Multi-domain SEO intelligence and action management'}
+        subtitle={primaryWebsite ? `Monitoring ${primaryWebsite.name} (${primaryWebsite.domain})` : 'AI SEO Intelligence and Multi-Domain Action Center'}
       />
 
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Zero State if No Websites Connected */}
-        {websites.length === 0 ? (
-          <div className="bg-card rounded-xl border border-dashed border-border p-12 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
-            <div className="w-12 h-12 rounded-full bg-primary-tint border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-center text-primary">
-              <Globe className="w-6 h-6" />
+        {/* Loading Spinner */}
+        {isLoading && websites.length === 0 && (
+          <div className="bg-card rounded-xl border border-border p-12 text-center shadow-xs flex flex-col items-center justify-center">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+            <p className="text-xs text-muted">Loading workspace intelligence...</p>
+          </div>
+        )}
+
+        {/* Clean Zero State if No Websites Connected */}
+        {!isLoading && websites.length === 0 && (
+          <div className="bg-card rounded-xl border border-dashed border-border p-12 text-center shadow-card flex flex-col items-center justify-center max-w-xl mx-auto space-y-5">
+            <div className="w-14 h-14 rounded-full bg-primary-tint border border-emerald-200 dark:border-emerald-900/40 flex items-center justify-center text-primary">
+              <Globe className="w-7 h-7" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-bold font-head text-text">No websites connected</h3>
-              <p className="text-xs text-muted max-w-sm mx-auto">
-                Connect your domain to run automated technical SEO crawls, monitor Search Console data, and track verified fixes.
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold font-head text-text">Welcome to RankPilot AI</h3>
+              <p className="text-xs text-muted max-w-sm mx-auto leading-relaxed">
+                Your dedicated SEO intelligence workspace is ready. Connect your first client domain to run automated audits, uncover GEO/AEO gaps, and track Search Console rankings.
               </p>
             </div>
-            <Link
-              href="/dashboard/websites"
-              className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-medium shadow-xs transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Connect Website</span>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Link
+                href="/dashboard/websites"
+                className="inline-flex items-center justify-center gap-1.5 h-10 px-5 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Connect Your First Website</span>
+              </Link>
+              <Link
+                href="/dashboard/gsc"
+                className="inline-flex items-center justify-center gap-1.5 h-10 px-4 bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text border border-border rounded-md text-xs font-medium transition-colors"
+              >
+                <Search className="w-4 h-4 text-muted" />
+                <span>Connect Search Console</span>
+              </Link>
+            </div>
           </div>
-        ) : (
+        )}
+
+        {/* Normal Dashboard View when Websites are Connected */}
+        {websites.length > 0 && (
           <>
             {/* First-Time Onboarding Experience Checklist */}
             {showChecklist && (
@@ -167,7 +182,7 @@ export default function DashboardOverviewPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-mono font-bold text-primary">
-                      {Math.round(([true, websites.length > 0, findings.length > 0, false, opportunities.length > 0, tasks.length > 0].filter(Boolean).length / 6) * 100)}% Complete
+                      {Math.round(([true, websites.length > 0, hasAudited, false, opportunities.length > 0, tasks.length > 0].filter(Boolean).length / 6) * 100)}% Complete
                     </span>
                     <button
                       onClick={handleDismissChecklist}
@@ -183,29 +198,21 @@ export default function DashboardOverviewPage() {
                   <div className="p-3 rounded-lg bg-card border border-emerald-200 dark:border-emerald-900/40 flex items-start gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <div className="space-y-0.5">
-                      <span className="text-xs font-semibold text-text">1. Plan Activated</span>
-                      <p className="text-[11px] text-muted">Workspace quotas and crawler configured.</p>
+                      <span className="text-xs font-semibold text-text">1. Workspace Initialized</span>
+                      <p className="text-[11px] text-muted">Isolated personal workspace ready.</p>
                     </div>
                   </div>
 
                   {/* Step 2: Add Website */}
                   <Link
                     href="/dashboard/websites"
-                    className={`p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
-                      websites.length > 0
-                        ? 'bg-card border-emerald-200 dark:border-emerald-900/40 text-text'
-                        : 'bg-card border-border hover:border-primary text-text'
-                    }`}
+                    className="p-3 rounded-lg bg-card border border-emerald-200 dark:border-emerald-900/40 flex items-start gap-2.5 text-text"
                   >
-                    {websites.length > 0 ? (
-                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
-                    )}
+                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     <div className="space-y-0.5">
-                      <span className="text-xs font-semibold">2. Connect First Website</span>
+                      <span className="text-xs font-semibold">2. Website Connected</span>
                       <p className="text-[11px] text-muted">
-                        {websites.length > 0 ? `${websites.length} domain(s) connected` : 'Add client domain →'}
+                        {websites.length} domain(s) monitored
                       </p>
                     </div>
                   </Link>
@@ -214,12 +221,12 @@ export default function DashboardOverviewPage() {
                   <Link
                     href="/dashboard/audits"
                     className={`p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
-                      findings.length > 0
+                      hasAudited
                         ? 'bg-card border-emerald-200 dark:border-emerald-900/40 text-text'
                         : 'bg-card border-border hover:border-primary text-text'
                     }`}
                   >
-                    {findings.length > 0 ? (
+                    {hasAudited ? (
                       <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                     ) : (
                       <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
@@ -227,7 +234,7 @@ export default function DashboardOverviewPage() {
                     <div className="space-y-0.5">
                       <span className="text-xs font-semibold">3. Run First SEO Audit</span>
                       <p className="text-[11px] text-muted">
-                        {findings.length > 0 ? `${findings.length} findings identified` : 'Launch crawler →'}
+                        {hasAudited ? `${findings.length} findings identified` : 'Launch crawler →'}
                       </p>
                     </div>
                   </Link>
@@ -279,7 +286,7 @@ export default function DashboardOverviewPage() {
                       <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
                     )}
                     <div className="space-y-0.5">
-                      <span className="text-xs font-semibold">6. Create First Action Item</span>
+                      <span className="text-xs font-semibold">6. Create Action Items</span>
                       <p className="text-[11px] text-muted">
                         {tasks.length > 0 ? `${tasks.length} task(s) active` : 'Assign fixes to execute →'}
                       </p>
@@ -295,16 +302,20 @@ export default function DashboardOverviewPage() {
               <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                 <div className="flex items-center justify-between text-xs text-muted font-medium">
                   <span>SEO Health Score</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className={`w-2 h-2 rounded-full ${hasAudited ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
-                    {primaryWebsite?.latestSeoScore || 0}
+                    {hasAudited ? primaryWebsite.latestSeoScore : '—'}
                   </span>
-                  <span className="text-xs text-muted">/ 100</span>
+                  {hasAudited && <span className="text-xs text-muted">/ 100</span>}
                 </div>
                 <p className="mt-2 text-xs text-muted">
-                  Technical, content & indexability factors
+                  {hasAudited ? 'Technical, content & indexability factors' : (
+                    <Link href={`/dashboard/audits?websiteId=${primaryWebsite?.id}`} className="text-primary hover:underline font-medium">
+                      Run first audit →
+                    </Link>
+                  )}
                 </p>
               </div>
 
@@ -312,16 +323,20 @@ export default function DashboardOverviewPage() {
               <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                 <div className="flex items-center justify-between text-xs text-muted font-medium">
                   <span>AI Engine Visibility</span>
-                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  <span className={`w-2 h-2 rounded-full ${hasAudited ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
-                    {Math.round(((primaryWebsite?.latestGeoScore || 0) + (primaryWebsite?.latestAeoScore || 0)) / 2) || 0}
+                    {hasAudited ? Math.round(((primaryWebsite.latestGeoScore || 0) + (primaryWebsite.latestAeoScore || 0)) / 2) : '—'}
                   </span>
-                  <span className="text-xs text-muted">/ 100</span>
+                  {hasAudited && <span className="text-xs text-muted">/ 100</span>}
                 </div>
                 <p className="mt-2 text-xs text-muted">
-                  GEO entity graph & AEO schema readiness
+                  {hasAudited ? 'GEO entity graph & AEO schema readiness' : (
+                    <Link href={`/dashboard/audits?websiteId=${primaryWebsite?.id}`} className="text-primary hover:underline font-medium">
+                      Run AI engine audit →
+                    </Link>
+                  )}
                 </p>
               </div>
 
@@ -329,7 +344,7 @@ export default function DashboardOverviewPage() {
               <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                 <div className="flex items-center justify-between text-xs text-muted font-medium">
                   <span>Action Items</span>
-                  <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span className={`w-2 h-2 rounded-full ${pendingTasks.length > 0 ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}></span>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
@@ -338,24 +353,29 @@ export default function DashboardOverviewPage() {
                   <span className="text-xs text-muted">to execute</span>
                 </div>
                 <p className="mt-2 text-xs text-muted">
-                  {verifiedTasks.length} improvements re-crawl verified
+                  {verifiedTasks.length > 0 ? `${verifiedTasks.length} improvements re-crawl verified` : (
+                    <Link href="/dashboard/action-center" className="text-primary hover:underline font-medium">
+                      Manage tasks in Action Center →
+                    </Link>
+                  )}
                 </p>
               </div>
 
-              {/* Card 4: Organic Growth */}
+              {/* Card 4: Organic Growth (Search Console) */}
               <div className="bg-card p-5 rounded-xl border border-border shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all">
                 <div className="flex items-center justify-between text-xs text-muted font-medium">
                   <span>Organic Search</span>
-                  <span className="text-[11px] font-semibold text-primary font-mono">+14.2%</span>
+                  <span className="text-[11px] font-semibold text-muted font-mono">GSC</span>
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-head text-text tracking-tight tnum">
-                    142.8k
+                    —
                   </span>
-                  <span className="text-xs text-muted">impressions</span>
                 </div>
                 <p className="mt-2 text-xs text-muted">
-                  Google Search Console (last 30 days)
+                  <Link href="/dashboard/gsc" className="text-primary hover:underline font-medium">
+                    Connect Search Console →
+                  </Link>
                 </p>
               </div>
             </div>
@@ -398,127 +418,131 @@ export default function DashboardOverviewPage() {
                     </Link>
                   </div>
 
-                  {activeTab === 'tasks' ? (
-                    <div className="divide-y divide-border">
-                      {tasks.slice(0, 5).map((task) => (
-                        <div key={task.id} className="py-3 flex items-center justify-between gap-4">
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full ${
-                                  task.priority === 'critical'
-                                    ? 'bg-red-50 text-error border border-red-200 dark:bg-red-950/40'
-                                    : task.priority === 'high'
-                                    ? 'bg-amber-50 text-warning border border-amber-200 dark:bg-amber-950/40'
-                                    : 'bg-blue-50 text-accent border border-blue-200 dark:bg-blue-950/40'
-                                }`}
-                              >
-                                {task.priority}
-                              </span>
-                              <h4 className="text-xs font-semibold text-text truncate">{task.title}</h4>
-                            </div>
-                            <p className="text-[11px] font-mono text-muted truncate">{task.affectedUrl}</p>
-                          </div>
-
+                  {/* Tasks List */}
+                  {activeTab === 'tasks' && (
+                    <div className="space-y-2.5">
+                      {tasks.length === 0 ? (
+                        <div className="p-8 text-center border border-dashed border-border rounded-lg space-y-2">
+                          <p className="text-xs text-muted">No action items created yet.</p>
                           <Link
-                            href={`/dashboard/action-center?task=${task.id}`}
-                            className="px-3 py-1.5 rounded-md border border-border bg-bg hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-medium text-text transition-colors shrink-0"
+                            href="/dashboard/audits"
+                            className="inline-flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
                           >
-                            Execute
+                            <span>Run an audit to generate prioritized action items</span>
+                            <ArrowRight className="w-3 h-3" />
                           </Link>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border">
-                      {opportunities.slice(0, 5).map((opp) => (
-                        <div key={opp.id} className="py-3 flex items-center justify-between gap-4">
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-primary-tint text-primary border border-emerald-200">
-                                Pos {opp.position?.toFixed(1) || '—'}
-                              </span>
-                              <h4 className="text-xs font-semibold text-text truncate">{opp.query}</h4>
+                      ) : (
+                        tasks.slice(0, 5).map((task) => (
+                          <div
+                            key={task.id}
+                            className="p-3 rounded-lg border border-border bg-bg/50 hover:bg-bg transition-colors flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  task.priority === 'critical'
+                                    ? 'bg-red-500'
+                                    : task.priority === 'high'
+                                    ? 'bg-amber-500'
+                                    : 'bg-blue-500'
+                                }`}
+                              />
+                              <div className="min-w-0">
+                                <span className="font-semibold text-text truncate block">{task.title}</span>
+                                <span className="text-[10px] text-muted truncate block">{task.category}</span>
+                              </div>
                             </div>
-                            <p className="text-[11px] font-mono text-muted truncate">{opp.pageUrl}</p>
+                            <span className="text-[11px] font-mono text-muted capitalize shrink-0">
+                              {task.status.replace('_', ' ')}
+                            </span>
                           </div>
+                        ))
+                      )}
+                    </div>
+                  )}
 
-                          <span className="text-xs font-mono font-medium text-text tnum shrink-0">
-                            {opp.impressions.toLocaleString()} impr
-                          </span>
+                  {/* Opportunities List */}
+                  {activeTab === 'opportunities' && (
+                    <div className="space-y-2.5">
+                      {opportunities.length === 0 ? (
+                        <div className="p-8 text-center border border-dashed border-border rounded-lg space-y-2">
+                          <p className="text-xs text-muted">No striking distance opportunities detected yet.</p>
+                          <Link
+                            href="/dashboard/gsc"
+                            className="inline-flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
+                          >
+                            <span>Connect Google Search Console to detect quick wins</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
                         </div>
-                      ))}
+                      ) : (
+                        opportunities.slice(0, 5).map((opp) => (
+                          <div
+                            key={opp.id}
+                            className="p-3 rounded-lg border border-border bg-bg/50 hover:bg-bg transition-colors flex items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="min-w-0">
+                              <span className="font-semibold text-text truncate block">{opp.query}</span>
+                              <span className="text-[10px] text-muted">Position {opp.position.toFixed(1)}</span>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-primary">
+                              {opp.impressions.toLocaleString()} imp
+                            </span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Right Column (5 cols): Performance Trend & Quick Actions */}
+              {/* Right Column (5 cols): Crawler Intelligence & Quick Actions */}
               <div className="lg:col-span-5 space-y-6">
-                {/* Search Console Performance Graph */}
-                <div className="bg-card rounded-xl border border-border shadow-xs p-5 space-y-3">
+                <div className="bg-card rounded-xl border border-border shadow-xs p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xs font-bold text-text">Organic Visibility Trend</h3>
-                      <p className="text-[11px] text-muted">Daily Search Console impressions</p>
-                    </div>
+                    <h3 className="text-xs font-bold font-head text-text uppercase tracking-wider">
+                      Crawler Intelligence
+                    </h3>
                     <Link
-                      href="/dashboard/gsc"
-                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                      href="/dashboard/audits"
+                      className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
                     >
-                      <span>Deep Dive</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <span>New Audit</span>
+                      <Plus className="w-3.5 h-3.5" />
                     </Link>
                   </div>
 
-                  <div className="h-44 w-full pt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={mockGscTrends} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="gscGreen" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#059669" stopOpacity={0.25} />
-                            <stop offset="95%" stopColor="#059669" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                        <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                        <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: '#FFFFFF',
-                            borderColor: '#E2E8F0',
-                            borderRadius: '8px',
-                            fontSize: '11px',
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="impressions"
-                          stroke="#059669"
-                          strokeWidth={2}
-                          fillOpacity={1}
-                          fill="url(#gscGreen)"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-bg border border-border flex items-center justify-between text-xs">
+                      <span className="text-muted">Total Findings Identified</span>
+                      <span className="font-bold text-text font-mono">{findings.length}</span>
+                    </div>
 
-                {/* Quick Audit Action Card */}
-                <div className="bg-card rounded-xl border border-border shadow-xs p-5 space-y-3 flex items-center justify-between">
-                  <div className="space-y-1">
-                    <h3 className="text-xs font-bold text-text">Audit Website Now</h3>
-                    <p className="text-[11px] text-muted">
-                      Run safe 30+ check crawler pass on {primaryWebsite?.name || 'domain'}.
-                    </p>
+                    <div className="p-3 rounded-lg bg-bg border border-border flex items-center justify-between text-xs">
+                      <span className="text-muted">Critical Issues</span>
+                      <span className="font-bold text-red-600 font-mono">
+                        {findings.filter((f) => f.severity === 'critical').length}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-bg border border-border flex items-center justify-between text-xs">
+                      <span className="text-muted">Warning / High Priority</span>
+                      <span className="font-bold text-amber-600 font-mono">
+                        {findings.filter((f) => f.severity === 'high').length}
+                      </span>
+                    </div>
                   </div>
 
-                  <Link
-                    href={`/dashboard/audits?websiteId=${primaryWebsite?.id || ''}`}
-                    className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-medium transition-colors shrink-0 shadow-xs"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Run Audit</span>
-                  </Link>
+                  <div className="pt-2">
+                    <Link
+                      href={`/dashboard/audits?websiteId=${primaryWebsite?.id}`}
+                      className="w-full h-9 bg-primary hover:bg-primary-hover text-white text-xs font-medium rounded-md shadow-xs transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      <span>Launch Full Domain Audit</span>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>

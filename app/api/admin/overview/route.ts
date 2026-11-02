@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { isServerSupabaseConfigured, createAdminClient } from '@/lib/supabase-server';
+import { isServerSupabaseConfigured } from '@/lib/supabase-server';
+import { getServerAuthContext } from '@/lib/auth-server';
 
 export async function GET(req: NextRequest) {
   try {
-    const websites = await db.getWebsites();
-    const audits = await db.getAuditRuns();
-    const users = await db.getProfiles();
-    const tasks = await db.getActionItems();
-    const logs = await db.getActivityLogs(10);
+    const auth = await getServerAuthContext(req);
+    if (!auth.isAdmin) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    const websites = await db.getWebsites(req);
+    const audits = await db.getAuditRuns(undefined, req);
+    const users = await db.getProfiles(req);
+    const tasks = await db.getActionItems(undefined, req);
+    const logs = await db.getActivityLogs(10, req);
 
     const metrics = {
       totalUsers: users.length,

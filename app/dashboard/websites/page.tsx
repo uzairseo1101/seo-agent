@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import DashboardHeader from '@/components/dashboard-header';
-import { storage } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { Website } from '@/lib/types';
 import {
@@ -21,16 +20,10 @@ import {
 import Link from 'next/link';
 
 export default function WebsitesManagementPage() {
-  const [websites, setWebsites] = useState<Website[]>(() => {
-    return storage.getWebsites().filter(
-      (w) =>
-        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
-        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
-    );
-  });
+  const [websites, setWebsites] = useState<Website[]>([]);
   const [isLoadingWebsites, setIsLoadingWebsites] = useState(true);
-  const [planTier, setPlanTier] = useState<string>('agency');
-  const [maxWebsites, setMaxWebsites] = useState<number>(15);
+  const [planTier, setPlanTier] = useState<string>('free');
+  const [maxWebsites, setMaxWebsites] = useState<number>(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Website | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,14 +58,10 @@ export default function WebsitesManagementPage() {
                 !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
             );
             setWebsites(cleanWebsites);
-            // Sync clean list into local storage
-            cleanWebsites.forEach((w: Website) => {
-              storage.addWebsite(w);
-            });
           }
         }
       } catch (err) {
-        // Fallback to storage
+        console.error('Failed to load websites:', err);
       } finally {
         if (mounted) {
           setIsLoadingWebsites(false);
@@ -103,10 +92,17 @@ export default function WebsitesManagementPage() {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
+      const cleanDomain = domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+      const cleanUrl = url.startsWith('http') ? url.trim() : `https://${url.trim()}`;
+
       const res = await fetch('/api/websites', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ name: name.trim(), domain: domain.trim(), url: url.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          domain: cleanDomain,
+          url: cleanUrl,
+        }),
       });
 
       const data = await res.json();
@@ -114,20 +110,17 @@ export default function WebsitesManagementPage() {
         throw new Error(data.error || 'Failed to add website.');
       }
 
-      // Sync into local client storage cache
-      storage.addWebsite({
-        id: data.website.id,
-        name: data.website.name,
-        domain: data.website.domain,
-        url: data.website.url,
-      });
-
       setWebsites((prev) => [data.website, ...prev.filter((w) => w.id !== data.website.id)]);
       setIsAddModalOpen(false);
       setName('');
       setDomain('');
       setUrl('');
       setFormError('');
+
+      // Dispatch global event for header selector
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('rankpilot-website-changed', { detail: { websiteId: data.website.id } }));
+      }
     } catch (err: any) {
       setFormError(err.message || 'Failed to add website.');
     } finally {
@@ -145,9 +138,8 @@ export default function WebsitesManagementPage() {
       }
       await fetch(`/api/websites?id=${deleteTarget.id}`, { method: 'DELETE', headers });
     } catch (e) {
-      // Continue client cleanup
+      console.error('Delete error:', e);
     }
-    storage.deleteWebsite(deleteTarget.id);
     setWebsites((prev) => prev.filter((w) => w.id !== deleteTarget.id));
     setDeleteTarget(null);
   };
@@ -199,7 +191,7 @@ export default function WebsitesManagementPage() {
         {/* Zero State / Empty State */}
         {!isLoadingWebsites && websites.length === 0 && (
           <div className="bg-card rounded-lg border border-dashed border-border p-12 text-center shadow-card flex flex-col items-center justify-center max-w-2xl mx-auto space-y-4">
-            <div className="w-14 h-14 rounded-full bg-primary-tint border border-emerald-200 flex items-center justify-center text-primary">
+            <div className="w-14 h-14 rounded-full bg-primary-tint border border-emerald-200 dark:border-emerald-900/40 flex items-center justify-center text-primary">
               <Globe className="w-7 h-7" />
             </div>
             <div className="space-y-1.5">
@@ -239,62 +231,57 @@ export default function WebsitesManagementPage() {
                         <a
                           href={site.url}
                           target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-mono text-muted hover:text-primary flex items-center gap-1 truncate"
+                          rel="noopener noreferrer"
+                          className="text-xs text-muted hover:text-primary transition-colors flex items-center gap-1 mt-0.5 truncate"
                         >
-                          <span className="truncate">{site.domain}</span>
+                          <span>{site.domain}</span>
                           <ExternalLink className="w-3 h-3 shrink-0" />
                         </a>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-900/50">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Active
-                      </span>
-                      <button
-                        onClick={() => setDeleteTarget(site)}
-                        className="p-1.5 text-muted hover:text-error rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                        title="Delete website"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setDeleteTarget(site)}
+                      className="p-1.5 text-muted hover:text-error hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors"
+                      title="Delete website"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* Clean Horizontal Scores */}
-                  <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                    <div className="p-2.5 rounded-lg bg-bg border border-border/80">
-                      <span className="text-[11px] text-muted block mb-0.5">SEO Health</span>
-                      <span className="text-base font-bold font-head text-text tnum">{site.latestSeoScore || 0}</span>
+                  {/* Score Badges */}
+                  <div className="grid grid-cols-3 gap-2 mt-4 text-center font-mono">
+                    <div className="p-2 rounded-md bg-bg border border-border">
+                      <span className="text-[10px] font-sans text-muted block uppercase">SEO</span>
+                      <span className="text-xs font-bold text-text tnum">
+                        {site.latestSeoScore > 0 ? site.latestSeoScore : '—'}
+                      </span>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-bg border border-border/80">
-                      <span className="text-[11px] text-muted block mb-0.5">GEO Entity</span>
-                      <span className="text-base font-bold font-head text-text tnum">{site.latestGeoScore || 0}</span>
+                    <div className="p-2 rounded-md bg-bg border border-border">
+                      <span className="text-[10px] font-sans text-muted block uppercase">GEO</span>
+                      <span className="text-xs font-bold text-text tnum">
+                        {site.latestGeoScore > 0 ? site.latestGeoScore : '—'}
+                      </span>
                     </div>
-                    <div className="p-2.5 rounded-lg bg-bg border border-border/80">
-                      <span className="text-[11px] text-muted block mb-0.5">AEO Answer</span>
-                      <span className="text-base font-bold font-head text-text tnum">{site.latestAeoScore || 0}</span>
+                    <div className="p-2 rounded-md bg-bg border border-border">
+                      <span className="text-[10px] font-sans text-muted block uppercase">AEO</span>
+                      <span className="text-xs font-bold text-text tnum">
+                        {site.latestAeoScore > 0 ? site.latestAeoScore : '—'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-border flex items-center justify-between">
+                <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
+                  <span className="text-muted flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Active Domain</span>
+                  </span>
                   <Link
                     href={`/dashboard/audits?websiteId=${site.id}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-hover transition-colors"
+                    className="font-semibold text-primary hover:underline flex items-center gap-1"
                   >
-                    <Play className="w-3 h-3 fill-current" />
                     <span>Run Audit</span>
-                  </Link>
-
-                  <Link
-                    href={`/dashboard/audits?websiteId=${site.id}`}
-                    className="text-xs font-medium text-accent hover:underline flex items-center gap-1"
-                  >
-                    <span>View Findings</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-3 h-3" />
                   </Link>
                 </div>
               </div>
@@ -305,12 +292,17 @@ export default function WebsitesManagementPage() {
 
       {/* Add Website Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg border border-border max-w-md w-full p-6 shadow-pop animate-in fade-in space-y-4">
-            <h3 className="text-base font-bold font-head text-text">Add Monitored Website</h3>
-            <p className="text-xs text-muted">
-              Enter target domain details. The safe crawler will immediately validate DNS and verify access boundaries.
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-card rounded-xl border border-border max-w-md w-full p-6 shadow-pop space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="font-head font-bold text-base text-text">Add Monitored Website</h3>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-muted hover:text-text text-sm p-1"
+              >
+                ✕
+              </button>
+            </div>
 
             {formError && (
               <div className="p-3 rounded-md bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-xs text-error flex items-center gap-2">
@@ -321,65 +313,62 @@ export default function WebsitesManagementPage() {
 
             <form onSubmit={handleAddWebsite} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-text block mb-1">Website Name</label>
+                <label className="text-xs font-semibold text-text block mb-1">
+                  Website / Brand Name
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. My Client Store"
+                  required
+                  placeholder="e.g. Acme Corp"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full h-10 px-3 bg-bg border border-border rounded-md text-xs text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  required
+                  className="w-full text-xs px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text block mb-1">Domain</label>
+                <label className="text-xs font-semibold text-text block mb-1">Domain Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. example.com"
+                  required
+                  placeholder="e.g. acme.com"
                   value={domain}
                   onChange={(e) => {
-                    const clean = e.target.value.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
-                    setDomain(clean);
-                    if (!url || url.includes(domain)) {
-                      setUrl(clean ? `https://${clean}` : '');
-                    }
+                    const val = e.target.value.toLowerCase().trim();
+                    setDomain(val);
+                    if (!url) setUrl(`https://${val}`);
                   }}
-                  className="w-full h-10 px-3 bg-bg border border-border rounded-md text-xs font-mono text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  required
+                  className="w-full text-xs px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text block mb-1">Full Root URL</label>
+                <label className="text-xs font-semibold text-text block mb-1">Full URL</label>
                 <input
                   type="url"
-                  placeholder="https://example.com"
+                  required
+                  placeholder="https://acme.com"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  className="w-full h-10 px-3 bg-bg border border-border rounded-md text-xs font-mono text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  required
+                  className="w-full text-xs px-3 h-10 rounded-md border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs font-mono"
                 />
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsAddModalOpen(false);
-                    setFormError('');
-                  }}
-                  className="h-9 px-4 border border-border bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-muted hover:text-text rounded-md text-xs font-medium transition-colors"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 h-9 rounded-md border border-border text-xs font-medium text-muted hover:text-text hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="h-9 px-4 bg-primary hover:bg-primary-hover text-white rounded-md text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 h-9 rounded-md bg-primary hover:bg-primary-hover text-white text-xs font-medium shadow-xs transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
-                  {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isLoading ? 'Saving...' : 'Save Website'}</span>
+                  {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  <span>Add Website</span>
                 </button>
               </div>
             </form>
@@ -389,27 +378,29 @@ export default function WebsitesManagementPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg border border-border max-w-sm w-full p-6 shadow-pop animate-in fade-in space-y-4">
-            <div className="flex items-center gap-3 text-error">
-              <ShieldAlert className="w-6 h-6" />
-              <h3 className="text-base font-bold font-head text-text">Remove Website?</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-card rounded-xl border border-border max-w-sm w-full p-6 shadow-pop space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 text-error flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
             </div>
-            <p className="text-xs text-muted leading-relaxed">
-              Are you sure you want to remove <strong className="text-text">{deleteTarget.name}</strong> ({deleteTarget.domain})? This will uncouple audits, crawler boundaries, and verification tracking.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="space-y-1">
+              <h3 className="font-head font-bold text-base text-text">Remove Website?</h3>
+              <p className="text-xs text-muted">
+                Are you sure you want to remove <span className="font-semibold text-text">{deleteTarget.name}</span>? This will stop monitoring this domain.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="h-9 px-3 border border-border bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-muted hover:text-text rounded-md text-xs font-medium transition-colors"
+                className="px-4 h-9 rounded-md border border-border text-xs font-medium text-muted hover:text-text transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="h-9 px-4 bg-error hover:bg-red-600 text-white rounded-md text-xs font-medium transition-colors"
+                className="px-4 h-9 rounded-md bg-error hover:bg-red-700 text-white text-xs font-medium shadow-xs transition-colors"
               >
-                Confirm Removal
+                Delete Website
               </button>
             </div>
           </div>

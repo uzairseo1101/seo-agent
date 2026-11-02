@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { storage } from '@/lib/storage';
 import { db } from '@/lib/db';
+import { getServerAuthContext } from '@/lib/auth-server';
 import { ActionItem, TaskPriority, TaskStatus, FindingCategory } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
-  const websiteId = req.nextUrl.searchParams.get('websiteId') || undefined;
-  const tasks = await db.getActionItems(websiteId, req);
-  return NextResponse.json({ success: true, tasks });
+  try {
+    const websiteId = req.nextUrl.searchParams.get('websiteId') || undefined;
+    const tasks = await db.getActionItems(websiteId, req);
+    return NextResponse.json({ success: true, tasks });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getServerAuthContext(req);
+    if (!auth.user || !auth.organizationId) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to create a task.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const { title, description, category, priority, affectedUrl, recommendedSolution, websiteId, dueDate } = body;
 
@@ -18,12 +30,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Title and Affected URL are required.' }, { status: 400 });
     }
 
-    const org = storage.getOrganization();
     const websites = await db.getWebsites(req);
-    const targetWebId = websiteId || websites[0]?.id || '00000000-0000-0000-0000-000000000001';
+    const targetWebId = websiteId || websites[0]?.id;
+
+    if (!targetWebId) {
+      return NextResponse.json({ success: false, error: 'Please connect a website before creating tasks.' }, { status: 400 });
+    }
 
     const newTask = await db.createActionItem({
-      organizationId: org.id,
+      organizationId: auth.organizationId,
       websiteId: targetWebId,
       sourceType: 'manual',
       title,
@@ -52,6 +67,11 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = await getServerAuthContext(req);
+    if (!auth.user || !auth.organizationId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { id, status, userNotes, dueDate } = body;
 
@@ -59,16 +79,12 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Task ID is required.' }, { status: 400 });
     }
 
-    const task = await db.updateActionItemStatus(id, status as TaskStatus, userNotes, req);
-    if (!task) {
-      return NextResponse.json({ success: false, error: 'Task not found.' }, { status: 404 });
+    const updated = await db.updateActionItemStatus(id, status, userNotes, req);
+    if (!updated) {
+      return NextResponse.json({ success: false, error: 'Task not found or update failed.' }, { status: 404 });
     }
 
-    if (dueDate) {
-      task.dueDate = dueDate;
-    }
-
-    return NextResponse.json({ success: true, task });
+    return NextResponse.json({ success: true, task: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

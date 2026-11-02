@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SiteJsonLd } from "@/components/seo/json-ld";
+import { AuthHashHandler } from "@/components/auth-hash-handler";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://rankpilot.ai"),
@@ -46,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-bg text-text font-sans antialiased selection:bg-primary-tint selection:text-primary">
+        <AuthHashHandler />
         <SiteJsonLd />
         {children}
       </body>

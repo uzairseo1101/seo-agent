@@ -21,46 +21,35 @@ import {
   mockOrganization
 } from './mock-data';
 
-// In-Memory state for local sessions with optional localStorage browser caching
+// In-Memory state for local sessions (initialized cleanly without shared fixtures)
 class StorageService {
-  private websites: Website[] = [...mockWebsites];
-  private auditRuns: AuditRun[] = [...mockAuditRuns];
-  private findings: AuditFinding[] = [...mockFindings];
-  private actionItems: ActionItem[] = [...mockActionItems];
-  private opportunities: SeoOpportunity[] = [...mockOpportunities];
-  private notifications: AppNotification[] = [...mockNotifications];
-  private reports: ClientReport[] = [...mockReports];
-  private currentUser: UserProfile = { ...mockUser };
-  private currentOrg: Organization = { ...mockOrganization };
+  private websites: Website[] = [];
+  private auditRuns: AuditRun[] = [];
+  private findings: AuditFinding[] = [];
+  private actionItems: ActionItem[] = [];
+  private opportunities: SeoOpportunity[] = [];
+  private notifications: AppNotification[] = [];
+  private reports: ClientReport[] = [];
+  private currentUser: UserProfile = {
+    id: '',
+    email: '',
+    fullName: 'User',
+    role: 'user',
+    createdAt: new Date().toISOString(),
+  };
+  private currentOrg: Organization = {
+    id: '',
+    name: 'Workspace',
+    slug: 'workspace',
+    plan: 'free',
+    maxWebsites: 1,
+    maxCrawledPagesPerAudit: 10,
+    maxAiAnalysesPerMonth: 50,
+    createdAt: new Date().toISOString(),
+  };
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedWebsites = localStorage.getItem('rp_websites');
-        if (storedWebsites) {
-          const parsed = JSON.parse(storedWebsites);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Filter out any legacy placeholder mock websites
-            const clean = parsed.filter((w: Website) =>
-              !['web-1', 'web-2', 'web-3'].includes(w.id) &&
-              !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name) &&
-              !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
-            );
-            this.websites = clean;
-            localStorage.setItem('rp_websites', JSON.stringify(clean));
-          }
-        }
-        const storedTasks = localStorage.getItem('rp_tasks');
-        if (storedTasks) {
-          const parsed = JSON.parse(storedTasks);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            this.actionItems = parsed;
-          }
-        }
-      } catch (e) {
-        // Silently ignore storage hydration errors
-      }
-    }
+    // Clean empty initialization - zero hardcoded cross-user leakage
   }
 
   private persist(key: string, data: any) {

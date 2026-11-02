@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Bell, Plus, Globe, Moon, Sun } from 'lucide-react';
-import { storage } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { Website } from '@/lib/types';
 
@@ -16,22 +15,10 @@ export default function DashboardHeader({
   subtitle?: string;
   actionButton?: React.ReactNode;
 }) {
-  const [websites, setWebsites] = useState<Website[]>(() => {
-    return storage.getWebsites().filter(
-      (w) =>
-        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
-        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
-    );
-  });
-  const [selectedWeb, setSelectedWeb] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('rankpilot_active_website_id');
-      if (saved) return saved;
-    }
-    return websites[0]?.id || '';
-  });
-  const notifications = storage.getNotifications();
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const [websites, setWebsites] = useState<Website[]>([]);
+  const [userId, setUserId] = useState<string>('');
+  const [selectedWeb, setSelectedWeb] = useState<string>('');
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -46,15 +33,24 @@ export default function DashboardHeader({
     }
   }, []);
 
+  const getStorageKey = (uid: string) => (uid ? `rankpilot_active_website_${uid}` : 'rankpilot_active_website');
+
+  // Load user & websites
   useEffect(() => {
     let mounted = true;
     const loadWebsites = async () => {
       try {
         const { data: { session } } = (await supabase?.auth.getSession()) || { data: { session: null } };
         const headers: Record<string, string> = {};
+        let currentUid = '';
+        if (session?.user?.id) {
+          currentUid = session.user.id;
+          if (mounted) setUserId(currentUid);
+        }
         if (session?.access_token) {
           headers['Authorization'] = `Bearer ${session.access_token}`;
         }
+
         const res = await fetch('/api/websites', { headers });
         if (res.ok) {
           const data = await res.json();
@@ -62,30 +58,59 @@ export default function DashboardHeader({
             const clean = data.websites.filter(
               (w: Website) =>
                 !['web-1', 'web-2', 'web-3'].includes(w.id) &&
-                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name) &&
+                !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
             );
             setWebsites(clean);
+
             if (clean.length > 0) {
-              const current = selectedWeb || (typeof window !== 'undefined' ? localStorage.getItem('rankpilot_active_website_id') : null);
-              if (!current || !clean.some((w: Website) => w.id === current)) {
+              const storageKey = getStorageKey(currentUid);
+              const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
+              if (saved && clean.some((w: Website) => w.id === saved)) {
+                setSelectedWeb(saved);
+              } else {
                 const firstId = clean[0].id;
                 setSelectedWeb(firstId);
                 if (typeof window !== 'undefined') {
-                  localStorage.setItem('rankpilot_active_website_id', firstId);
+                  localStorage.setItem(storageKey, firstId);
                 }
               }
+            } else {
+              setSelectedWeb('');
             }
           }
         }
-      } catch {
+      } catch (e) {
         // Silently use current state
       }
     };
+
     loadWebsites();
+
+    const handleWebsiteChange = () => {
+      loadWebsites();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('rankpilot-website-changed', handleWebsiteChange);
+    }
+
     return () => {
       mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('rankpilot-website-changed', handleWebsiteChange);
+      }
     };
-  }, [selectedWeb]);
+  }, []);
+
+  const handleSelectWebsite = (id: string) => {
+    setSelectedWeb(id);
+    if (typeof window !== 'undefined') {
+      const storageKey = getStorageKey(userId);
+      localStorage.setItem(storageKey, id);
+      window.dispatchEvent(new CustomEvent('rankpilot-website-changed', { detail: { websiteId: id } }));
+    }
+  };
 
   const toggleDarkMode = () => {
     const nextDark = !isDark;
@@ -115,14 +140,7 @@ export default function DashboardHeader({
             <Globe className="w-3.5 h-3.5 text-muted shrink-0" />
             <select
               value={selectedWeb}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSelectedWeb(val);
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('rankpilot_active_website_id', val);
-                  window.dispatchEvent(new CustomEvent('rankpilot-website-changed', { detail: { websiteId: val } }));
-                }
-              }}
+              onChange={(e) => handleSelectWebsite(e.target.value)}
               className="bg-transparent border-none outline-none font-medium cursor-pointer text-text"
             >
               {websites.map((w) => (
@@ -138,7 +156,7 @@ export default function DashboardHeader({
         <button
           onClick={toggleDarkMode}
           className="w-10 h-10 rounded-md border border-border bg-card flex items-center justify-center text-muted hover:text-text hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-xs"
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           aria-label="Toggle dark mode"
         >
           {isDark ? <Sun className="w-4 h-4 text-warning" /> : <Moon className="w-4 h-4" />}

@@ -1,4 +1,5 @@
-import { createAdminClient, createServerClient, getSupabaseServerClient, isServerSupabaseConfigured } from '@/lib/supabase-server';
+import { createAdminClient, createServerClient, getSupabaseServerClient } from '@/lib/supabase-server';
+import { getServerAuthContext, getAdminSupabase } from '@/lib/auth-server';
 import { storage } from '@/lib/storage';
 import { NextRequest } from 'next/server';
 import { generateUuid, isValidUuid } from '@/lib/utils';
@@ -14,89 +15,38 @@ import {
 } from '@/lib/types';
 
 /**
- * Unified Database Access Layer.
- * Interacts directly with Supabase PostgreSQL if credentials exist,
- * otherwise falls back gracefully to in-memory/localStorage storage.
+ * Unified Multi-Tenant Database Access Layer.
+ * Every query is strictly isolated by the authenticated user's organization.
  */
 class DatabaseService {
+  private inMemoryLogs: any[] = [];
+
   private getClient(req?: NextRequest | Headers | null) {
-    return getSupabaseServerClient(req) || createAdminClient() || createServerClient();
-  }
-
-  /**
-   * Resolves a valid UUID organization for website creation:
-   * 1. Checks if client is an authenticated user belonging to an organization in memberships.
-   * 2. Checks public.organizations for any existing organization UUID.
-   * 3. Inserts a default organization with a valid UUID if none exists.
-   */
-  private async getOrCreateDefaultOrganization(client: any): Promise<string> {
-    try {
-      // 1. Authenticated user organization resolution
-      try {
-        const { data: authData } = await client.auth.getUser();
-        if (authData?.user?.id) {
-          const { data: member } = await client
-            .from('memberships')
-            .select('organization_id')
-            .eq('user_id', authData.user.id)
-            .limit(1)
-            .maybeSingle();
-          if (member?.organization_id && isValidUuid(member.organization_id)) {
-            return member.organization_id;
-          }
-        }
-      } catch {
-        // Silently continue
-      }
-
-      // 2. Query public.organizations
-      const { data: org } = await client
-        .from('organizations')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-
-      if (org?.id && isValidUuid(org.id)) {
-        return org.id;
-      }
-
-      // 3. Create a default organization with valid UUID
-      const newOrgId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000001';
-      const { data: created } = await client
-        .from('organizations')
-        .insert({
-          id: newOrgId,
-          name: 'Apex Growth Marketing',
-          slug: `agency-${Date.now()}`,
-          plan: 'agency',
-        })
-        .select('id')
-        .maybeSingle();
-
-      if (created?.id && isValidUuid(created.id)) {
-        return created.id;
-      }
-      return newOrgId;
-    } catch (e) {
-      console.warn('Error resolving organization UUID:', e);
-      return '00000000-0000-0000-0000-000000000001';
-    }
+    return getAdminSupabase() || getSupabaseServerClient(req) || createAdminClient() || createServerClient();
   }
 
   // ==========================================
-  // WEBSITES
+  // WEBSITES (Strictly Scoped by Workspace)
   // ==========================================
   async getWebsites(req?: NextRequest | Headers | null): Promise<Website[]> {
+    const auth = await getServerAuthContext(req);
+    if (!auth.organizationId) {
+      // Unauthenticated or brand new user with 0 websites
+      return [];
+    }
+
     const client = this.getClient(req);
     if (client) {
       try {
         const { data, error } = await client
           .from('websites')
           .select('*')
+          .eq('organization_id', auth.organizationId)
+          .neq('status', 'archived')
           .order('created_at', { ascending: false });
 
-        if (!error && data) {
-          const mapped: Website[] = data.map((row: any) => ({
+        if (!error && Array.isArray(data)) {
+          return data.map((row: any) => ({
             id: row.id,
             organizationId: row.organization_id,
             name: row.name,
@@ -109,33 +59,28 @@ class DatabaseService {
             lastAuditedAt: row.last_audited_at || undefined,
             createdAt: row.created_at || new Date().toISOString(),
           }));
-
-          // Sync into memory cache
-          mapped.forEach((w) => {
-            storage.addWebsite(w);
-          });
-
-          return mapped;
-        } else if (error) {
-          console.error('Database getWebsites error:', error);
         }
       } catch (e) {
-        console.error('Database getWebsites fallback:', e);
+        console.error('Database getWebsites error:', e);
       }
     }
-    return storage.getWebsites();
+    return [];
   }
 
   async getWebsiteById(id: string, req?: NextRequest | Headers | null): Promise<Website | null> {
+    if (!id || !isValidUuid(id)) return null;
+
+    const auth = await getServerAuthContext(req);
     const client = this.getClient(req);
     if (client) {
       try {
-        const { data, error } = await client
-          .from('websites')
-          .select('*')
-          .eq('id', id)
-          .single();
+        let query = client.from('websites').select('*').eq('id', id);
+        // Ordinary users can only access websites belonging to their organization
+        if (!auth.isAdmin && auth.organizationId && req) {
+          query = query.eq('organization_id', auth.organizationId);
+        }
 
+        const { data, error } = await query.maybeSingle();
         if (!error && data) {
           return {
             id: data.id,
@@ -152,10 +97,12 @@ class DatabaseService {
           };
         }
       } catch (e) {
-        // Fallback to storage
+        console.error('Database getWebsiteById error:', e);
       }
     }
-    return storage.getWebsiteById(id) || null;
+    const fallback = storage.getWebsiteById(id);
+    if (fallback) return fallback;
+    return null;
   }
 
   async createWebsite(
@@ -168,96 +115,120 @@ class DatabaseService {
     },
     req?: NextRequest | Headers | null
   ): Promise<Website> {
+    const auth = await getServerAuthContext(req);
+    const orgId = auth.organizationId || data.organizationId || (req ? null : '00000000-0000-0000-0000-000000000001');
+    if (!orgId) {
+      throw new Error('Authentication required to connect a website.');
+    }
+
     const cleanDomain = data.domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
     const cleanUrl = data.url.startsWith('http') ? data.url.trim() : `https://${data.url.trim()}`;
-    const generatedId = (data.id && isValidUuid(data.id))
-      ? data.id
-      : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-0000-0000-000000000001');
+    const generatedId = (data.id && isValidUuid(data.id)) ? data.id : generateUuid();
 
     const client = this.getClient(req);
     if (client) {
-      try {
-        const orgId = (data.organizationId && isValidUuid(data.organizationId))
-          ? data.organizationId
-          : await this.getOrCreateDefaultOrganization(client);
+      const { data: row, error } = await client
+        .from('websites')
+        .insert({
+          id: generatedId,
+          organization_id: orgId,
+          name: data.name.trim(),
+          domain: cleanDomain,
+          url: cleanUrl,
+          status: 'active',
+          latest_seo_score: 0,
+          latest_geo_score: 0,
+          latest_aeo_score: 0,
+        })
+        .select()
+        .single();
 
-        const { data: row, error } = await client
-          .from('websites')
-          .insert({
-            id: generatedId,
-            organization_id: orgId,
-            name: data.name.trim(),
-            domain: cleanDomain,
-            url: cleanUrl,
-            status: 'active',
-            latest_seo_score: 0,
-            latest_geo_score: 0,
-            latest_aeo_score: 0,
-          })
-          .select()
-          .single();
+      if (error) {
+        console.error('Database createWebsite error:', error);
+        throw new Error(error.message || 'Failed to create website record.');
+      }
 
-        if (error) {
-          console.error('Database createWebsite error:', error);
-        } else if (row) {
-          const newSite: Website = {
-            id: row.id,
-            organizationId: row.organization_id,
-            name: row.name,
-            domain: row.domain,
-            url: row.url,
-            status: row.status || 'active',
-            latestSeoScore: 0,
-            latestGeoScore: 0,
-            latestAeoScore: 0,
-            createdAt: row.created_at || new Date().toISOString(),
-          };
-          storage.addWebsite(newSite);
-          await this.logActivity('website_created', 'website', newSite.id, { name: newSite.name, domain: newSite.domain }, req);
-          return newSite;
-        }
-      } catch (e) {
-        console.error('Database createWebsite fallback:', e);
+      if (row) {
+        const newSite: Website = {
+          id: row.id,
+          organizationId: row.organization_id,
+          name: row.name,
+          domain: row.domain,
+          url: row.url,
+          status: row.status || 'active',
+          latestSeoScore: 0,
+          latestGeoScore: 0,
+          latestAeoScore: 0,
+          createdAt: row.created_at || new Date().toISOString(),
+        };
+        await this.logActivity('website_created', 'website', newSite.id, { name: newSite.name, domain: newSite.domain }, req);
+        return newSite;
       }
     }
 
-    const created = storage.addWebsite({
+    // Offline / Test fallback
+    const fallbackSite: Website = {
       id: generatedId,
-      name: data.name,
+      organizationId: orgId,
+      name: data.name.trim(),
       domain: cleanDomain,
       url: cleanUrl,
-    });
-    await this.logActivity('website_created', 'website', created.id, { name: created.name, domain: created.domain }, req);
-    return created;
+      status: 'active',
+      latestSeoScore: 0,
+      latestGeoScore: 0,
+      latestAeoScore: 0,
+      createdAt: new Date().toISOString(),
+    };
+    storage.addWebsite(fallbackSite);
+    return fallbackSite;
   }
 
   async deleteWebsite(id: string, req?: NextRequest | Headers | null): Promise<boolean> {
+    if (!id || !isValidUuid(id)) return false;
+
+    const auth = await getServerAuthContext(req);
     const client = this.getClient(req);
     if (client) {
       try {
-        await client.from('websites').delete().eq('id', id);
+        let query = client.from('websites').delete().eq('id', id);
+        if (!auth.isAdmin && auth.organizationId && req) {
+          query = query.eq('organization_id', auth.organizationId);
+        }
+        await query;
+        await this.logActivity('website_deleted', 'website', id, {}, req);
+        return true;
       } catch (e) {
-        console.error('Database deleteWebsite fallback:', e);
+        console.error('Database deleteWebsite error:', e);
       }
     }
-    await this.logActivity('website_deleted', 'website', id, {}, req);
-    return storage.deleteWebsite(id);
+    storage.deleteWebsite(id);
+    return true;
   }
 
   // ==========================================
-  // AUDITS & FINDINGS
+  // AUDITS & FINDINGS (Scoped by Authorized Website)
   // ==========================================
   async getAuditRuns(websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditRun[]> {
+    const auth = await getServerAuthContext(req);
+    if (!auth.organizationId) return [];
+
     const client = this.getClient(req);
-    if (client) {
-      try {
-        let query = client.from('audit_runs').select('*').order('started_at', { ascending: false });
-        if (websiteId && isValidUuid(websiteId)) {
-          query = query.eq('website_id', websiteId);
-        }
-        const { data, error } = await query;
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const mappedRuns = data.map((row: any) => ({
+    if (!client) return [];
+
+    try {
+      // If websiteId is specified, verify it belongs to user's workspace
+      if (websiteId) {
+        const site = await this.getWebsiteById(websiteId, req);
+        if (!site) return []; // Website does not belong to this user
+
+        const { data, error } = await client
+          .from('audit_runs')
+          .select('*')
+          .eq('website_id', websiteId)
+          .order('started_at', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          return data.map((row: any) => ({
             id: row.id,
             websiteId: row.website_id,
             status: row.status || 'completed',
@@ -268,117 +239,139 @@ class DatabaseService {
             crawlDurationMs: row.crawl_duration_ms || 0,
             startedAt: row.started_at || new Date().toISOString(),
             completedAt: row.completed_at || undefined,
-            findingsCount: {
-              critical: 0,
-              high: 0,
-              medium: 0,
-              low: 0,
-            },
+            findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
           }));
-
-          // Sync into memory storage
-          mappedRuns.forEach((r) => {
-            storage.saveAuditRun(r, []);
-          });
-
-          return mappedRuns;
         }
-      } catch (e) {
-        console.error('Database getAuditRuns fallback:', e);
+      } else {
+        // Get all websites for this organization
+        const userWebsites = await this.getWebsites(req);
+        if (userWebsites.length === 0) return [];
+        const webIds = userWebsites.map(w => w.id);
+
+        const { data, error } = await client
+          .from('audit_runs')
+          .select('*')
+          .in('website_id', webIds)
+          .order('started_at', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          return data.map((row: any) => ({
+            id: row.id,
+            websiteId: row.website_id,
+            status: row.status || 'completed',
+            pagesCrawled: row.pages_crawled || 0,
+            seoScore: Number(row.seo_score) || 0,
+            geoScore: Number(row.geo_score) || 0,
+            aeoScore: Number(row.aeo_score) || 0,
+            crawlDurationMs: row.crawl_duration_ms || 0,
+            startedAt: row.started_at || new Date().toISOString(),
+            completedAt: row.completed_at || undefined,
+            findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
+          }));
+        }
       }
+    } catch (e) {
+      console.error('Database getAuditRuns error:', e);
     }
-    return storage.getAuditRuns(websiteId);
+    return [];
   }
 
   async getFindings(runId?: string, websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditFinding[]> {
+    const auth = await getServerAuthContext(req);
+    if (!auth.organizationId) return [];
+
     const client = this.getClient(req);
-    if (client) {
-      try {
-        let query = client.from('audit_findings').select('*').order('created_at', { ascending: false });
-        if (runId && isValidUuid(runId)) {
-          query = query.eq('audit_run_id', runId);
-        }
-        if (websiteId && isValidUuid(websiteId)) {
-          query = query.eq('website_id', websiteId);
-        }
-        const { data, error } = await query;
-        if (!error && Array.isArray(data) && data.length > 0) {
-          return data.map((row: any) => ({
-            id: row.id,
-            auditRunId: row.audit_run_id,
-            websiteId: row.website_id,
-            url: row.url,
-            category: row.category as FindingCategory,
-            issueType: row.issue_type,
-            severity: row.severity,
-            title: row.title,
-            description: row.description,
-            recommendation: row.recommendation,
-            confidenceLevel: row.confidence_level || 'high',
-            detectionMethod: row.detection_method,
-            evidence: {
-              expected: row.expected_condition || row.recommendation || 'Compliant with search standards',
-              actual: row.actual_condition || row.description || 'Defect detected during crawl',
-            },
-            isResolved: row.is_resolved || false,
-            createdAt: row.created_at || new Date().toISOString(),
-          }));
-        }
-      } catch (e) {
-        console.error('Database getFindings fallback:', e);
+    if (!client) return [];
+
+    try {
+      if (websiteId) {
+        const site = await this.getWebsiteById(websiteId, req);
+        if (!site) return []; // Website belongs to another tenant
       }
+
+      let query = client.from('audit_findings').select('*').order('created_at', { ascending: false });
+      if (runId && isValidUuid(runId)) {
+        query = query.eq('audit_run_id', runId);
+      }
+      if (websiteId && isValidUuid(websiteId)) {
+        query = query.eq('website_id', websiteId);
+      }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        return data.map((row: any) => ({
+          id: row.id,
+          auditRunId: row.audit_run_id,
+          websiteId: row.website_id,
+          url: row.url,
+          category: row.category as FindingCategory,
+          issueType: row.issue_type,
+          severity: row.severity,
+          title: row.title,
+          description: row.description,
+          recommendation: row.recommendation,
+          confidenceLevel: row.confidence_level || 'high',
+          detectionMethod: row.detection_method,
+          evidence: {
+            expected: row.expected_condition || row.recommendation || 'Compliant with search standards',
+            actual: row.actual_condition || row.description || 'Defect detected during crawl',
+          },
+          isResolved: row.is_resolved || false,
+          createdAt: row.created_at || new Date().toISOString(),
+        }));
+      }
+    } catch (e) {
+      console.error('Database getFindings error:', e);
     }
-    return storage.getFindings(runId);
+    return [];
   }
 
   async saveAuditRun(run: AuditRun, findings: AuditFinding[], req?: NextRequest | Headers | null): Promise<void> {
-    storage.saveAuditRun(run, findings);
-
     const client = this.getClient(req);
-    if (client) {
-      try {
-        const runId = isValidUuid(run.id) ? run.id : generateUuid();
-        await client.from('audit_runs').insert({
-          id: runId,
+    if (!client) return;
+
+    try {
+      const runId = isValidUuid(run.id) ? run.id : generateUuid();
+      await client.from('audit_runs').insert({
+        id: runId,
+        website_id: run.websiteId,
+        status: run.status,
+        pages_crawled: run.pagesCrawled,
+        seo_score: run.seoScore,
+        geo_score: run.geoScore,
+        aeo_score: run.aeoScore,
+        crawl_duration_ms: run.crawlDurationMs,
+        started_at: run.startedAt,
+        completed_at: run.completedAt,
+      });
+
+      await client.from('websites').update({
+        latest_seo_score: run.seoScore,
+        latest_geo_score: run.geoScore,
+        latest_aeo_score: run.aeoScore,
+        last_audited_at: run.completedAt,
+      }).eq('id', run.websiteId);
+
+      if (findings.length > 0) {
+        const findingRows = findings.map(f => ({
+          id: isValidUuid(f.id) ? f.id : generateUuid(),
+          audit_run_id: runId,
           website_id: run.websiteId,
-          status: run.status,
-          pages_crawled: run.pagesCrawled,
-          seo_score: run.seoScore,
-          geo_score: run.geoScore,
-          aeo_score: run.aeoScore,
-          crawl_duration_ms: run.crawlDurationMs,
-          started_at: run.startedAt,
-          completed_at: run.completedAt,
-        });
-
-        await client.from('websites').update({
-          latest_seo_score: run.seoScore,
-          latest_geo_score: run.geoScore,
-          latest_aeo_score: run.aeoScore,
-          last_audited_at: run.completedAt,
-        }).eq('id', run.websiteId);
-
-        if (findings.length > 0) {
-          const findingRows = findings.map(f => ({
-            id: isValidUuid(f.id) ? f.id : generateUuid(),
-            audit_run_id: runId,
-            website_id: run.websiteId,
-            url: f.url,
-            category: f.category,
-            issue_type: f.issueType,
-            severity: f.severity,
-            title: f.title,
-            description: f.description,
-            recommendation: f.recommendation,
-            confidence_level: f.confidenceLevel,
-            detection_method: f.detectionMethod,
-            is_resolved: f.isResolved,
-          }));
-          await client.from('audit_findings').insert(findingRows);
-        }
-      } catch (e) {
-        console.error('Database saveAuditRun error:', e);
+          url: f.url,
+          category: f.category,
+          issue_type: f.issueType,
+          severity: f.severity,
+          title: f.title,
+          description: f.description,
+          recommendation: f.recommendation,
+          confidence_level: f.confidenceLevel,
+          detection_method: f.detectionMethod,
+          is_resolved: f.isResolved,
+        }));
+        await client.from('audit_findings').insert(findingRows);
       }
+    } catch (e) {
+      console.error('Database saveAuditRun error:', e);
     }
 
     await this.logActivity('audit_executed', 'audit_run', run.id, {
@@ -389,88 +382,89 @@ class DatabaseService {
   }
 
   // ==========================================
-  // ACTION ITEMS / TASKS
+  // ACTION ITEMS / TASKS (Strict Workspace Scoping)
   // ==========================================
   async getActionItems(websiteId?: string, req?: NextRequest | Headers | null): Promise<ActionItem[]> {
+    const auth = await getServerAuthContext(req);
+    if (!auth.organizationId) return [];
+
     const client = this.getClient(req);
-    if (client) {
-      try {
-        let query = client.from('action_items').select('*').order('created_at', { ascending: false });
-        if (websiteId && isValidUuid(websiteId)) {
-          query = query.eq('website_id', websiteId);
-        }
-        const { data, error } = await query;
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const mappedTasks = data.map((row: any) => ({
-            id: row.id,
-            organizationId: row.organization_id,
-            websiteId: row.website_id,
-            sourceType: row.source_type,
-            sourceId: row.source_id || undefined,
-            title: row.title,
-            description: row.description,
-            category: row.category as FindingCategory,
-            priority: row.priority as TaskPriority,
-            affectedUrl: row.affected_url,
-            recommendedSolution: row.recommended_solution,
-            steps: Array.isArray(row.step_by_step_instructions) ? row.step_by_step_instructions : [],
-            status: row.status as TaskStatus,
-            verificationStatus: row.verification_status || 'unverified',
-            dueDate: row.due_date || undefined,
-            completedAt: row.completed_at || undefined,
-            userNotes: row.user_notes || undefined,
-            createdAt: row.created_at || new Date().toISOString(),
-          }));
+    if (!client) return [];
 
-          // Sync into memory storage
-          mappedTasks.forEach((t) => {
-            storage.addActionItem(t);
-          });
+    try {
+      let query = client
+        .from('action_items')
+        .select('*')
+        .eq('organization_id', auth.organizationId)
+        .order('created_at', { ascending: false });
 
-          return mappedTasks;
-        }
-      } catch (e) {
-        console.error('Database getActionItems fallback:', e);
+      if (websiteId && isValidUuid(websiteId)) {
+        query = query.eq('website_id', websiteId);
       }
+
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        return data.map((row: any) => ({
+          id: row.id,
+          organizationId: row.organization_id,
+          websiteId: row.website_id,
+          sourceType: row.source_type,
+          sourceId: row.source_id || undefined,
+          title: row.title,
+          description: row.description,
+          category: row.category as FindingCategory,
+          priority: row.priority as TaskPriority,
+          affectedUrl: row.affected_url,
+          recommendedSolution: row.recommended_solution,
+          steps: Array.isArray(row.step_by_step_instructions) ? row.step_by_step_instructions : [],
+          status: row.status as TaskStatus,
+          verificationStatus: row.verification_status || 'unverified',
+          dueDate: row.due_date || undefined,
+          completedAt: row.completed_at || undefined,
+          userNotes: row.user_notes || undefined,
+          createdAt: row.created_at || new Date().toISOString(),
+        }));
+      }
+    } catch (e) {
+      console.error('Database getActionItems error:', e);
     }
-    return storage.getActionItems(websiteId);
+    return [];
   }
 
   async createActionItem(item: Partial<ActionItem>, req?: NextRequest | Headers | null): Promise<ActionItem> {
+    const auth = await getServerAuthContext(req);
+    const orgId = auth.organizationId || item.organizationId || (req ? null : '00000000-0000-0000-0000-000000000001');
+    if (!orgId) {
+      throw new Error('Authentication required to create action tasks.');
+    }
+
     const taskId = (item.id && isValidUuid(item.id)) ? item.id : generateUuid();
     const client = this.getClient(req);
-    let organizationId = item.organizationId;
+
+    const taskRow = {
+      id: taskId,
+      organization_id: orgId,
+      website_id: item.websiteId,
+      source_type: item.sourceType || 'manual',
+      source_id: (item.sourceId && isValidUuid(item.sourceId)) ? item.sourceId : null,
+      title: item.title || 'Untitled Action Item',
+      description: item.description || item.title || '',
+      category: (item.category as FindingCategory) || 'technical',
+      priority: (item.priority as TaskPriority) || 'medium',
+      affected_url: item.affectedUrl || '',
+      recommended_solution: item.recommendedSolution || 'Implement optimization.',
+      step_by_step_instructions: item.steps || [],
+      status: item.status || 'todo',
+      verification_status: item.verificationStatus === 'completed_verified' ? 'verified' : (item.verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified'),
+      due_date: item.dueDate || null,
+      created_at: item.createdAt || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
     if (client) {
       try {
-        if (!organizationId || !isValidUuid(organizationId)) {
-          organizationId = await this.getOrCreateDefaultOrganization(client);
-        }
-
-        const taskRow = {
-          id: taskId,
-          organization_id: organizationId,
-          website_id: item.websiteId,
-          source_type: item.sourceType || 'manual',
-          source_id: (item.sourceId && isValidUuid(item.sourceId)) ? item.sourceId : null,
-          title: item.title || 'Untitled Action Item',
-          description: item.description || item.title || '',
-          category: (item.category as FindingCategory) || 'technical',
-          priority: (item.priority as TaskPriority) || 'medium',
-          affected_url: item.affectedUrl || '',
-          recommended_solution: item.recommendedSolution || 'Implement optimization.',
-          step_by_step_instructions: item.steps || [],
-          status: item.status || 'todo',
-          verification_status: item.verificationStatus === 'completed_verified' ? 'verified' : (item.verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified'),
-          due_date: item.dueDate || null,
-          created_at: item.createdAt || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-
         const { error } = await client.from('action_items').insert(taskRow);
-        if (error) {
-          console.error('Database createActionItem error:', error);
-        }
+        if (error) console.error('Database createActionItem error:', error);
       } catch (e) {
         console.error('Database createActionItem fallback:', e);
       }
@@ -478,7 +472,7 @@ class DatabaseService {
 
     const newTask: ActionItem = {
       id: taskId,
-      organizationId: organizationId || '00000000-0000-0000-0000-000000000001',
+      organizationId: orgId,
       websiteId: item.websiteId || '',
       sourceType: item.sourceType || 'manual',
       sourceId: item.sourceId,
@@ -495,12 +489,16 @@ class DatabaseService {
       createdAt: item.createdAt || new Date().toISOString(),
     };
 
-    storage.addActionItem(newTask);
     await this.logActivity('task_created', 'action_item', newTask.id, { title: newTask.title }, req);
     return newTask;
   }
 
   async updateActionItemStatus(id: string, status: TaskStatus, notes?: string, req?: NextRequest | Headers | null): Promise<ActionItem | null> {
+    if (!id || !isValidUuid(id)) return null;
+
+    const auth = await getServerAuthContext(req);
+    if (!auth.organizationId) return null;
+
     const client = this.getClient(req);
     if (client) {
       try {
@@ -514,24 +512,42 @@ class DatabaseService {
         if (notes !== undefined) {
           updates.user_notes = notes;
         }
-        await client.from('action_items').update(updates).eq('id', id);
+
+        let query = client.from('action_items').update(updates).eq('id', id);
+        if (!auth.isAdmin) {
+          query = query.eq('organization_id', auth.organizationId);
+        }
+        await query;
       } catch (e) {
-        console.error('Database updateActionItemStatus fallback:', e);
+        console.error('Database updateActionItemStatus error:', e);
       }
     }
-    const updated = storage.updateActionItemStatus(id, status);
-    if (updated && notes !== undefined) {
-      updated.userNotes = notes;
-    }
+
     await this.logActivity('task_status_updated', 'action_item', id, { status }, req);
-    return updated || null;
+    return null;
   }
 
   // ==========================================
-  // USERS & PROFILES (ADMIN)
+  // USERS & PROFILES (ADMIN ONLY)
   // ==========================================
-  async getProfiles(): Promise<UserProfile[]> {
-    const client = this.getClient();
+  async getProfiles(req?: NextRequest | Headers | null): Promise<UserProfile[]> {
+    if (req) {
+      const auth = await getServerAuthContext(req);
+      if (!auth.isAdmin) {
+        if (auth.user) {
+          return [{
+            id: auth.user.id,
+            email: auth.user.email,
+            fullName: auth.user.fullName,
+            role: auth.user.role,
+            createdAt: new Date().toISOString(),
+          }];
+        }
+        return [];
+      }
+    }
+
+    const client = this.getClient(req);
     if (client) {
       try {
         const { data, error } = await client
@@ -539,56 +555,53 @@ class DatabaseService {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && data) {
+        if (!error && Array.isArray(data) && data.length > 0) {
           return data.map((row: any) => ({
             id: row.id,
             email: row.email,
-            fullName: row.full_name || row.email.split('@')[0],
+            fullName: row.full_name || row.email?.split('@')[0] || 'User',
             avatarUrl: row.avatar_url || undefined,
             role: row.role || 'user',
             createdAt: row.created_at || new Date().toISOString(),
           }));
         }
       } catch (e) {
-        console.error('Database getProfiles fallback:', e);
+        console.error('Database getProfiles error:', e);
       }
     }
 
-    // Default mock user
-    const defaultUser = storage.getUser();
+    // Default system admin profile for test environments
     return [
-      defaultUser,
       {
-        id: 'usr-admin-1',
-        email: 'founder@rankpilot.ai',
-        fullName: 'Uzair (Founder)',
+        id: '00000000-0000-0000-0000-000000000001',
+        email: 'uzairnoor1101@gmail.com',
+        fullName: 'Uzair Noor',
         role: 'superadmin',
-        createdAt: '2026-10-01T08:00:00Z',
-      },
-      {
-        id: 'usr-demo-2',
-        email: 'client@saasflow.io',
-        fullName: 'Agency Partner Demo',
-        role: 'user',
-        createdAt: '2026-10-15T12:30:00Z',
+        createdAt: new Date().toISOString(),
       },
     ];
   }
 
-  async updateProfileRole(id: string, role: 'user' | 'admin' | 'superadmin'): Promise<boolean> {
-    const client = this.getClient();
+  async updateProfileRole(id: string, role: 'user' | 'admin' | 'superadmin', req?: NextRequest | Headers | null): Promise<boolean> {
+    if (req) {
+      const auth = await getServerAuthContext(req);
+      if (!auth.isAdmin) {
+        throw new Error('Forbidden: Only administrators can modify user roles.');
+      }
+    }
+
+    const client = this.getClient(req);
     if (client) {
       try {
         const { error } = await client.from('profiles').update({ role, updated_at: new Date().toISOString() }).eq('id', id);
         if (!error) {
-          await this.logActivity('user_role_changed', 'profile', id, { newRole: role });
+          await this.logActivity('user_role_updated', 'user', id, { newRole: role }, req);
           return true;
         }
       } catch (e) {
         console.error('Database updateProfileRole error:', e);
       }
     }
-    await this.logActivity('user_role_changed', 'profile', id, { newRole: role });
     return true;
   }
 
@@ -602,69 +615,47 @@ class DatabaseService {
     metadata?: any,
     req?: NextRequest | Headers | null
   ): Promise<void> {
+    const auth = await getServerAuthContext(req);
+    const entry = {
+      id: generateUuid(),
+      organization_id: auth.organizationId || 'default-org',
+      user_id: auth.user?.id || null,
+      action,
+      entity_type: entityType,
+      entity_id: entityId || null,
+      metadata: metadata || null,
+      created_at: new Date().toISOString(),
+    };
+    this.inMemoryLogs.unshift(entry);
+
+    if (!auth.organizationId) return;
+
     const client = this.getClient(req);
     if (client) {
       try {
-        const orgId = await this.getOrCreateDefaultOrganization(client);
-        await client.from('activity_logs').insert({
-          organization_id: orgId,
-          action,
-          entity_type: entityType,
-          entity_id: entityId || null,
-          metadata: metadata || null,
-          created_at: new Date().toISOString(),
-        });
+        await client.from('activity_logs').insert(entry);
       } catch (e) {
         // Log silently
       }
     }
   }
 
-  async getActivityLogs(limit = 50): Promise<any[]> {
-    const client = this.getClient();
+  async getActivityLogs(limit = 50, req?: NextRequest | Headers | null): Promise<any[]> {
+    const auth = await getServerAuthContext(req);
+    const client = this.getClient(req);
     if (client) {
       try {
-        const { data, error } = await client
-          .from('activity_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        if (!error && data && data.length > 0) {
-          return data;
+        let query = client.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(limit);
+        if (!auth.isAdmin && auth.organizationId) {
+          query = query.eq('organization_id', auth.organizationId);
         }
+        const { data, error } = await query;
+        if (!error && Array.isArray(data) && data.length > 0) return data;
       } catch (e) {
-        // Fallback
+        // Fallback to in-memory
       }
     }
-
-    // Default fixture activity logs
-    return [
-      {
-        id: 'log-1',
-        action: 'audit_completed',
-        entity_type: 'website',
-        entity_id: 'web-1',
-        metadata: { domain: 'saasflow.io', seoScore: 78 },
-        created_at: new Date(Date.now() - 3600000).toISOString(),
-      },
-      {
-        id: 'log-2',
-        action: 'user_sign_in',
-        entity_type: 'profile',
-        entity_id: 'usr-1',
-        metadata: { email: 'founder@rankpilot.ai' },
-        created_at: new Date(Date.now() - 7200000).toISOString(),
-      },
-      {
-        id: 'log-3',
-        action: 'website_created',
-        entity_type: 'website',
-        entity_id: 'web-1',
-        metadata: { name: 'SaasFlow App', domain: 'saasflow.io' },
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-      },
-    ];
+    return this.inMemoryLogs.slice(0, limit);
   }
 }
 

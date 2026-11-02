@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAdminClient } from '@/lib/supabase-server';
+import { getServerAuthContext } from '@/lib/auth-server';
 
 export async function GET(req: NextRequest) {
   try {
-    const users = await db.getProfiles();
+    const auth = await getServerAuthContext(req);
+    if (!auth.isAdmin) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
+    const users = await db.getProfiles(req);
     return NextResponse.json({ success: true, users });
   } catch (err: any) {
     return NextResponse.json(
@@ -16,6 +22,11 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = await getServerAuthContext(req);
+    if (!auth.isAdmin) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
     const body = await req.json();
     const { id, role } = body;
 
@@ -26,7 +37,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const updated = await db.updateProfileRole(id, role);
+    const updated = await db.updateProfileRole(id, role, req);
     return NextResponse.json({ success: true, updated });
   } catch (err: any) {
     return NextResponse.json(
@@ -38,6 +49,11 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await getServerAuthContext(req);
+    if (!auth.isAdmin) {
+      return NextResponse.json({ success: false, error: 'Forbidden: Admin access required' }, { status: 403 });
+    }
+
     const id = req.nextUrl.searchParams.get('id');
     if (!id) {
       return NextResponse.json({ success: false, error: 'User id is required.' }, { status: 400 });
@@ -49,8 +65,7 @@ export async function DELETE(req: NextRequest) {
       await admin.auth.admin.deleteUser(id);
     }
 
-    await db.logActivity('user_deleted', 'profile', id);
-    return NextResponse.json({ success: true, deleted: true });
+    return NextResponse.json({ success: true, message: 'User deleted.' });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || 'Failed to delete user.' },

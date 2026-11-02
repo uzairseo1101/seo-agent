@@ -123,6 +123,7 @@ export async function executeWebsiteAudit(
   };
 
   // 8. Persist audit run, findings, and website scores to Supabase & storage
+  storage.saveAuditRun(auditRun, allFindings);
   await db.saveAuditRun(auditRun, allFindings);
 
   // 9. Automatically convert Critical and High findings into Action Center tasks in Supabase

@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { Website } from '@/lib/types';
 import { validateEntitlement, getOrganizationEntitlements } from '@/lib/entitlements';
-import { getSupabaseServerClient, createAdminClient, createServerClient } from '@/lib/supabase-server';
+import { getServerAuthContext } from '@/lib/auth-server';
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await getServerAuthContext(req);
     const websites = await db.getWebsites(req);
+
     // Filter out any legacy mock placeholder websites if any linger
     const cleanWebsites = websites.filter(
       (w: Website) =>
@@ -15,9 +17,7 @@ export async function GET(req: NextRequest) {
         !['saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk'].includes(w.domain)
     );
 
-    // Resolve organization entitlements
-    const orgId = cleanWebsites[0]?.organizationId || null;
-    const entitlements = await getOrganizationEntitlements(orgId);
+    const entitlements = await getOrganizationEntitlements(auth.organizationId);
 
     return NextResponse.json({
       success: true,
@@ -35,8 +35,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await getServerAuthContext(req);
+    if (!auth.user || !auth.organizationId) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required to add a website.' },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
-    const { name, domain, url, organizationId } = body;
+    const { name, domain, url } = body;
 
     if (!name || !domain || !url) {
       return NextResponse.json(
@@ -45,34 +53,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Resolve organization ID for entitlement validation
-    let resolvedOrgId = organizationId;
-    if (!resolvedOrgId) {
-      const client = getSupabaseServerClient(req) || createAdminClient() || createServerClient();
-      if (client) {
-        try {
-          const { data: authData } = await client.auth.getUser();
-          if (authData?.user?.id) {
-            const { data: member } = await client
-              .from('memberships')
-              .select('organization_id')
-              .eq('user_id', authData.user.id)
-              .limit(1)
-              .maybeSingle();
-            if (member?.organization_id) resolvedOrgId = member.organization_id;
-          }
-          if (!resolvedOrgId) {
-            const { data: org } = await client.from('organizations').select('id').limit(1).maybeSingle();
-            if (org?.id) resolvedOrgId = org.id;
-          }
-        } catch {
-          // Fall through to default
-        }
-      }
-    }
-
-    // Server-Side Entitlement Check: enforce website limit
-    const validation = await validateEntitlement(resolvedOrgId, 'websites');
+    // Server-Side Entitlement Check: enforce website limit strictly against user's organization
+    const validation = await validateEntitlement(auth.organizationId, 'websites');
     if (!validation.allowed) {
       return NextResponse.json(
         {
@@ -92,7 +74,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         domain: domain.trim(),
         url: url.trim(),
-        organizationId: resolvedOrgId,
+        organizationId: auth.organizationId,
       },
       req
     );
@@ -108,13 +90,33 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get('id');
+    const auth = await getServerAuthContext(req);
+    if (!auth.user || !auth.organizationId) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required.' },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
     if (!id) {
-      return NextResponse.json({ success: false, error: 'id is required.' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Website ID is required.' },
+        { status: 400 }
+      );
     }
 
     const deleted = await db.deleteWebsite(id, req);
-    return NextResponse.json({ success: true, deleted });
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: 'Website not found or unauthorized to delete.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, deleted: true });
   } catch (err: any) {
     return NextResponse.json(
       { success: false, error: err.message || 'Failed to delete website.' },

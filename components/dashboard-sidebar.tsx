@@ -19,7 +19,6 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { storage } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 
 interface NavItem {
@@ -46,32 +45,66 @@ const workspaceNavItems: NavItem[] = [
 export default function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const org = storage.getOrganization();
   const [userEmail, setUserEmail] = useState<string>('');
+  const [userFullName, setUserFullName] = useState<string>('');
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
-    if (supabase) {
-      supabase.auth.getUser().then(({ data }) => {
-        if (data?.user?.email) {
-          setUserEmail(data.user.email);
+    let mounted = true;
+    const client = supabase;
+    if (client) {
+      client.auth.getUser().then(({ data }) => {
+        if (data?.user?.email && mounted) {
           const email = data.user.email;
-          if (
+          setUserEmail(email);
+          setUserFullName(data.user.user_metadata?.full_name || email.split('@')[0] || 'User');
+
+          const isFounder =
             email === 'founder@rankpilot.ai' ||
             email.endsWith('@uzairseo.com') ||
-            email.includes('uzairnoor')
-          ) {
+            email.includes('uzairnoor');
+
+          if (isFounder) {
             setIsAdmin(true);
+          } else if (client) {
+            // Check role from profiles
+            client
+              .from('profiles')
+              .select('role')
+              .eq('id', data.user.id)
+              .maybeSingle()
+              .then(({ data: prof }) => {
+                if (mounted && (prof?.role === 'admin' || prof?.role === 'superadmin')) {
+                  setIsAdmin(true);
+                }
+              });
           }
         }
       });
     }
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (e) {
+      console.error('Sign out error:', e);
     }
+
+    if (typeof window !== 'undefined') {
+      // Purge all user workspace keys
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('rankpilot_') || key.startsWith('rp_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
+
     router.push('/signin');
   };
 
@@ -167,7 +200,7 @@ export default function DashboardSidebar() {
                   : "text-muted hover:text-text hover:bg-slate-100 dark:hover:bg-slate-800/60"
               )}
             >
-              <ShieldAlert className="w-4 h-4 shrink-0 text-accent" />
+              <ShieldAlert className="w-4 h-4 shrink-0 text-amber-500" />
               <span>Admin Console</span>
             </Link>
           )}
@@ -183,7 +216,7 @@ export default function DashboardSidebar() {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-semibold text-text truncate">
-                {userEmail ? userEmail.split('@')[0] : 'Workspace'}
+                {userFullName || (userEmail ? userEmail.split('@')[0] : 'User')}
               </span>
               <span className="text-[10px] text-muted truncate">
                 {userEmail || 'Active'}
