@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const token_hash = requestUrl.searchParams.get('token_hash');
   const type = requestUrl.searchParams.get('type');
   const errorDescription = requestUrl.searchParams.get('error_description');
-  const next = requestUrl.searchParams.get('next') || '/dashboard';
+  const next = requestUrl.searchParams.get('next') || '/onboarding/plan-selection';
   const origin = requestUrl.origin;
 
   if (errorDescription) {

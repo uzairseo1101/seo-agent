@@ -437,20 +437,20 @@ export default function HomePage() {
             <span className={isAnnualPricing ? 'text-text font-bold flex items-center gap-1.5' : 'text-muted flex items-center gap-1.5'}>
               <span>Annual billing</span>
               <span className="text-[10px] font-mono font-bold text-primary bg-primary-tint border border-emerald-200 px-2 py-0.5 rounded-full">
-                Save 20%
+                Save ~17% (2 months free)
               </span>
             </span>
           </div>
         </div>
 
         {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto items-stretch">
           {PRICING_CONFIG.tiers.map((tier) => {
-            const price = isAnnualPricing ? tier.annualMonthlyPrice : tier.monthlyPrice;
+            const price = isAnnualPricing ? tier.annualMonthlyEquivalent : tier.monthlyPrice;
             return (
               <div
                 key={tier.id}
-                className={`bg-card rounded-2xl p-7 shadow-xs flex flex-col justify-between relative transition-all ${
+                className={`bg-card rounded-2xl p-6 shadow-xs flex flex-col justify-between relative transition-all ${
                   tier.popular
                     ? 'border-2 border-primary shadow-pop'
                     : 'border border-border'
@@ -462,7 +462,7 @@ export default function HomePage() {
                   </div>
                 )}
 
-                <div className="space-y-5">
+                <div className="space-y-4">
                   <div>
                     <span className={`text-xs font-bold uppercase tracking-wider font-head ${
                       tier.popular ? 'text-primary' : 'text-muted'
@@ -470,21 +470,31 @@ export default function HomePage() {
                       {tier.name}
                     </span>
                     <div className="flex items-baseline gap-1 mt-2">
-                      <span className="text-3xl sm:text-4xl font-bold font-head text-text">
-                        ${price}
+                      <span className="text-3xl font-bold font-head text-text tnum">
+                        ${price === 0 ? '0' : price.toFixed(price % 1 === 0 ? 0 : 2)}
                       </span>
                       <span className="text-xs text-muted font-mono">/ month</span>
                     </div>
-                    <p className="mt-2 text-xs text-muted leading-relaxed">
+                    {tier.id !== 'free' && isAnnualPricing && (
+                      <span className="text-[11px] font-mono text-primary block mt-1">
+                        Billed annually (${tier.annualPrice}/yr) • Save ${tier.annualSavings}
+                      </span>
+                    )}
+                    {tier.id === 'free' && (
+                      <span className="text-[11px] font-mono text-muted block mt-1">
+                        Free forever, no card needed
+                      </span>
+                    )}
+                    <p className="mt-2 text-xs text-muted leading-relaxed min-h-[36px]">
                       {tier.tagline}
                     </p>
                   </div>
 
                   <div className="pt-3 border-t border-border">
-                    <ul className="space-y-2.5 text-xs text-muted">
+                    <ul className="space-y-2 text-xs text-muted">
                       {tier.features.slice(0, 5).map((f, i) => (
-                        <li key={i} className="flex items-center gap-2">
-                          <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <li key={i} className="flex items-start gap-2">
+                          <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
                           <span className="text-text">{f}</span>
                         </li>
                       ))}
@@ -494,8 +504,8 @@ export default function HomePage() {
 
                 <div className="pt-6">
                   <Link
-                    href={tier.ctaHref}
-                    className={`w-full h-11 flex items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                    href={`${tier.ctaHref}${isAnnualPricing ? '&billing=annual' : '&billing=monthly'}`}
+                    className={`w-full h-10 flex items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
                       tier.primaryCta
                         ? 'bg-primary hover:bg-primary-hover text-white shadow-xs'
                         : 'border border-border bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text shadow-xs'

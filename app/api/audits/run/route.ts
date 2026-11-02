@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeWebsiteAudit } from '@/lib/analyzer/audit-engine';
+import { db } from '@/lib/db';
+import { getOrganizationEntitlements } from '@/lib/entitlements';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,9 +12,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'websiteId or url is required.' }, { status: 400 });
     }
 
+    // Resolve website's organization to get exact server-enforced crawl limits
+    let orgId: string | null = null;
+    if (websiteId) {
+      const site = await db.getWebsiteById(websiteId, req);
+      if (site?.organizationId) {
+        orgId = site.organizationId;
+      }
+    }
+
+    const entitlements = await getOrganizationEntitlements(orgId);
+    const maxAllowedPages = entitlements.maxCrawledPages; // 10 for Free, 25 for Freelancer, 100 for Agency, 500 for Team
+
+    // Safe clamp: requested pages cannot exceed the subscription allowance
+    const requestedPages = typeof maxPages === 'number' ? maxPages : 10;
+    const effectiveMaxPages = Math.min(Math.max(requestedPages, 1), maxAllowedPages);
+    const effectiveMaxDepth = typeof maxDepth === 'number' ? Math.min(Math.max(maxDepth, 1), 3) : 2;
+
     const result = await executeWebsiteAudit(websiteId || `web-${Date.now()}`, {
-      maxPages: typeof maxPages === 'number' ? Math.min(maxPages, 25) : 15,
-      maxDepth: typeof maxDepth === 'number' ? Math.min(maxDepth, 2) : 1,
+      maxPages: effectiveMaxPages,
+      maxDepth: effectiveMaxDepth,
       targetUrl: url,
       targetDomain: domain,
       targetName: name,
@@ -20,6 +39,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      plan: entitlements.plan,
+      maxAllowedPages,
+      pagesCrawled: result.auditRun.pagesCrawled,
       auditRun: result.auditRun,
       findings: result.findings,
       findingsCount: result.findings.length,

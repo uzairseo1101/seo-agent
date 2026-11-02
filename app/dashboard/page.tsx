@@ -46,6 +46,23 @@ export default function DashboardOverviewPage() {
   const [opportunities, setOpportunities] = useState<SeoOpportunity[]>(storage.getOpportunities());
   const [tasks, setTasks] = useState<ActionItem[]>(storage.getActionItems());
   const [activeTab, setActiveTab] = useState<'tasks' | 'opportunities'>('tasks');
+  const [showChecklist, setShowChecklist] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const dismissed = localStorage.getItem('rankpilot_dismiss_onboarding');
+      if (dismissed === 'true' && !window.location.search.includes('welcome=true')) {
+        setShowChecklist(false);
+      }
+    }
+  }, []);
+
+  const handleDismissChecklist = () => {
+    setShowChecklist(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rankpilot_dismiss_onboarding', 'true');
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -131,6 +148,147 @@ export default function DashboardOverviewPage() {
           </div>
         ) : (
           <>
+            {/* First-Time Onboarding Experience Checklist */}
+            {showChecklist && (
+              <div className="bg-card rounded-xl border border-primary/20 bg-gradient-to-r from-primary-tint/20 via-card to-card p-5 shadow-card space-y-4 animate-in fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-head font-bold text-sm text-text">
+                        Welcome to RankPilot AI — Getting Started Checklist
+                      </h3>
+                      <p className="text-xs text-muted">
+                        Follow these 6 steps to turn audit findings into ranked results.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-mono font-bold text-primary">
+                      {Math.round(([true, websites.length > 0, findings.length > 0, false, opportunities.length > 0, tasks.length > 0].filter(Boolean).length / 6) * 100)}% Complete
+                    </span>
+                    <button
+                      onClick={handleDismissChecklist}
+                      className="text-xs text-muted hover:text-text px-2 py-1 rounded transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-border/60">
+                  {/* Step 1: Account & Plan */}
+                  <div className="p-3 rounded-lg bg-card border border-emerald-200 dark:border-emerald-900/40 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-semibold text-text">1. Plan Activated</span>
+                      <p className="text-[11px] text-muted">Workspace quotas and crawler configured.</p>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Add Website */}
+                  <Link
+                    href="/dashboard/websites"
+                    className={`p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
+                      websites.length > 0
+                        ? 'bg-card border-emerald-200 dark:border-emerald-900/40 text-text'
+                        : 'bg-card border-border hover:border-primary text-text'
+                    }`}
+                  >
+                    {websites.length > 0 ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-semibold">2. Connect First Website</span>
+                      <p className="text-[11px] text-muted">
+                        {websites.length > 0 ? `${websites.length} domain(s) connected` : 'Add client domain →'}
+                      </p>
+                    </div>
+                  </Link>
+
+                  {/* Step 3: Run Audit */}
+                  <Link
+                    href="/dashboard/audits"
+                    className={`p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
+                      findings.length > 0
+                        ? 'bg-card border-emerald-200 dark:border-emerald-900/40 text-text'
+                        : 'bg-card border-border hover:border-primary text-text'
+                    }`}
+                  >
+                    {findings.length > 0 ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-semibold">3. Run First SEO Audit</span>
+                      <p className="text-[11px] text-muted">
+                        {findings.length > 0 ? `${findings.length} findings identified` : 'Launch crawler →'}
+                      </p>
+                    </div>
+                  </Link>
+
+                  {/* Step 4: GSC OAuth */}
+                  <Link
+                    href="/dashboard/gsc"
+                    className="p-3 rounded-lg bg-card border border-border hover:border-primary transition-all flex items-start gap-2.5 text-text"
+                  >
+                    <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-semibold">4. Connect Search Console</span>
+                      <p className="text-[11px] text-muted">Sync impressions, clicks, CTR →</p>
+                    </div>
+                  </Link>
+
+                  {/* Step 5: Opportunities */}
+                  <Link
+                    href="/dashboard/opportunities"
+                    className={`p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
+                      opportunities.length > 0
+                        ? 'bg-card border-emerald-200 dark:border-emerald-900/40 text-text'
+                        : 'bg-card border-border hover:border-primary text-text'
+                    }`}
+                  >
+                    {opportunities.length > 0 ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-semibold">5. Review Opportunities</span>
+                      <p className="text-[11px] text-muted">Striking distance positions 11-20 →</p>
+                    </div>
+                  </Link>
+
+                  {/* Step 6: Create Action Items */}
+                  <Link
+                    href="/dashboard/action-center"
+                    className={`p-3 rounded-lg border transition-all flex items-start gap-2.5 ${
+                      tasks.length > 0
+                        ? 'bg-card border-emerald-200 dark:border-emerald-900/40 text-text'
+                        : 'bg-card border-border hover:border-primary text-text'
+                    }`}
+                  >
+                    {tasks.length > 0 ? (
+                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-muted shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-0.5">
+                      <span className="text-xs font-semibold">6. Create First Action Item</span>
+                      <p className="text-[11px] text-muted">
+                        {tasks.length > 0 ? `${tasks.length} task(s) active` : 'Assign fixes to execute →'}
+                      </p>
+                    </div>
+                  </Link>
+                </div>
+              </div>
+            )}
+
             {/* Top 4 Metric Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Card 1: SEO Score */}

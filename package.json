@@ -7,15 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test tests/admin-dashboard.test.ts tests/phase1-websites-api.test.ts tests/phase2.test.ts tests/phase3.test.ts tests/phase4.test.ts tests/phase5.test.ts tests/phase6.test.ts tests/phase7.test.ts tests/end-to-end-workflow.test.ts"
+    "test": "tsx --test tests/admin-dashboard.test.ts tests/subscriptions-and-entitlements.test.ts tests/phase1-websites-api.test.ts tests/phase2.test.ts tests/phase3.test.ts tests/phase4.test.ts tests/phase5.test.ts tests/phase6.test.ts tests/phase7.test.ts tests/end-to-end-workflow.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
+    "@types/pg": "^8.23.1",
     "cheerio": "^1.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.475.0",
     "next": "^15.1.7",
+    "pg": "^8.23.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.1",

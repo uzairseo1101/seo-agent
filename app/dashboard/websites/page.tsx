@@ -29,6 +29,8 @@ export default function WebsitesManagementPage() {
     );
   });
   const [isLoadingWebsites, setIsLoadingWebsites] = useState(true);
+  const [planTier, setPlanTier] = useState<string>('agency');
+  const [maxWebsites, setMaxWebsites] = useState<number>(15);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Website | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,6 +56,8 @@ export default function WebsitesManagementPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.websites) && mounted) {
+            if (data.plan) setPlanTier(data.plan);
+            if (typeof data.maxWebsites === 'number') setMaxWebsites(data.maxWebsites);
             const cleanWebsites = data.websites.filter(
               (w: Website) =>
                 !['web-1', 'web-2', 'web-3'].includes(w.id) &&
@@ -160,10 +164,19 @@ export default function WebsitesManagementPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-bold font-head text-text">
-              Connected Client Websites ({websites.length})
+              Connected Client Websites ({websites.length} of {maxWebsites})
             </h2>
-            <p className="text-xs text-muted">
-              Organization limit: 15 active domains under Agency Plan
+            <p className="text-xs text-muted flex items-center gap-1">
+              <span>
+                {websites.length >= maxWebsites
+                  ? `Domain limit reached (${maxWebsites} max domains on ${planTier.toUpperCase()} Plan).`
+                  : `Plan allowance: Up to ${maxWebsites} active client domains under ${planTier.toUpperCase()} Plan.`}
+              </span>
+              {websites.length >= maxWebsites && (
+                <Link href="/pricing" className="text-primary hover:underline font-semibold ml-1">
+                  Upgrade plan →
+                </Link>
+              )}
             </p>
           </div>
           <button

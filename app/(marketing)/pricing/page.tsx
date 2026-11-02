@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Check, X, ShieldCheck, ArrowRight, ChevronDown, HelpCircle, AlertCircle } from 'lucide-react';
+import { Check, X, ShieldCheck, ArrowRight, ChevronDown, HelpCircle, AlertCircle, Sparkles } from 'lucide-react';
 import { PRICING_CONFIG } from '@/lib/pricing-config';
 import { BreadcrumbsJsonLd, FaqJsonLd } from '@/components/seo/json-ld';
 
@@ -12,40 +12,41 @@ export default function PricingPage() {
 
   const pricingFaqs = [
     {
-      q: 'Can I try RankPilot AI for free?',
-      a: 'Yes. You can start with our free starter tier to audit your website, inspect technical health scores, and connect Google Search Console with no credit card required.',
+      q: 'Can I start using RankPilot AI completely for free?',
+      a: 'Yes. Our Free plan gives you 1 monitored website, up to 10 crawled pages per audit, and complete SEO, GEO and AEO health scores with zero credit card required.',
     },
     {
       q: 'How do audit credits and page crawl limits work?',
-      a: 'Crawl limits determine how many unique internal pages our crawler analyzes per audit run. For example, the Agency tier crawls up to 100 pages per domain pass, checking metadata, speed, schemas, and links on every page.',
+      a: 'Crawl limits determine how many unique internal pages our crawler analyzes per audit run. For example, Freelancer crawls up to 25 pages, Agency crawls up to 100 pages, and Team crawls up to 500 pages per domain pass.',
     },
     {
-      q: 'Can I switch between plans at any time?',
-      a: 'Yes. You can upgrade, downgrade, or switch between monthly and annual billing cycles whenever your agency needs change. Upgrades take effect immediately with pro-rated billing.',
+      q: 'How much do I save with annual billing?',
+      a: 'Annual billing gives you 12 months for the price of 10 months (approximately 17% savings). Freelancer saves $78/year, Agency saves $198/year, and Team saves $298/year.',
+    },
+    {
+      q: 'Which payment methods are accepted internationally?',
+      a: 'Through our secure global Merchant of Record billing, we accept all major international credit and debit cards (Visa, Mastercard, American Express), Apple Pay, and Google Pay from 135+ countries.',
     },
     {
       q: 'Are client reports truly white-label for agencies?',
-      a: 'Yes. On the Agency and Team tiers, you can upload your agency logo, customize primary accent colors, and remove all RankPilot AI branding from generated PDF reports and client-facing summaries.',
+      a: 'Yes. On the Agency and Team tiers, you can export branded executive PDF client reports with your own agency name, logo, custom findings, and verification proof.',
     },
     {
-      q: 'What is the cancellation and refund policy?',
-      a: '[confirm policy] You can cancel your subscription at any time directly from your billing settings. We offer a 14-day money-back satisfaction guarantee on all first-time agency plans if you are unsatisfied with our automated verification.',
-    },
-    {
-      q: 'Which payment methods are accepted?',
-      a: 'We accept all major credit and debit cards (Visa, Mastercard, American Express). Enterprise team invoices with wire transfers are available upon request.',
+      q: 'Can I change plans or cancel at any time?',
+      a: 'Yes. You can upgrade, downgrade, or cancel your subscription at any time with a single click in your account settings. There are no lock-in contracts.',
     },
   ];
 
   return (
-    <div className="py-12 sm:py-20 max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+    <div className="py-12 sm:py-20 max-w-[1300px] mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
       <BreadcrumbsJsonLd
         items={[
-          { name: 'Home', url: 'https://rankpilot.ai' },
-          { name: 'Pricing', url: 'https://rankpilot.ai/pricing' },
+          { name: 'Home', url: 'https://seoagent.uzairseo.com' },
+          { name: 'Pricing', url: 'https://seoagent.uzairseo.com/pricing' },
         ]}
       />
       <FaqJsonLd faqs={pricingFaqs} />
+
       {/* 1. Header */}
       <div className="text-center space-y-4 max-w-2xl mx-auto">
         <span className="text-xs font-mono font-medium text-primary uppercase tracking-wider">
@@ -55,7 +56,7 @@ export default function PricingPage() {
           Simple pricing for freelancers, agencies and teams
         </h1>
         <p className="text-sm sm:text-base text-muted leading-relaxed">
-          No hidden fees, no per-keyword gouging. Choose the right plan to scale your agency's SEO operations.
+          From solo SEO consultants to high-scale digital marketing agencies. Select the plan that matches your client portfolio.
         </p>
 
         {/* Monthly / Annual Toggle */}
@@ -76,28 +77,29 @@ export default function PricingPage() {
           </button>
           <span className={isAnnual ? 'text-text font-bold flex items-center gap-1.5' : 'text-muted flex items-center gap-1.5'}>
             <span>Annual billing</span>
-            <span className="text-[10px] font-mono font-bold text-primary bg-primary-tint border border-emerald-200/80 px-2 py-0.5 rounded-full">
-              Save {PRICING_CONFIG.annualDiscountPercentage}% [confirm]
+            <span className="text-[10px] font-mono font-bold text-primary bg-primary-tint border border-emerald-200 px-2 py-0.5 rounded-full">
+              Save ~17% (2 months free)
             </span>
           </span>
         </div>
       </div>
 
-      {/* 2. Three Plan Cards (Driven by PRICING_CONFIG) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+      {/* 2. Four Plan Cards (Free, Freelancer, Agency, Team) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
         {PRICING_CONFIG.tiers.map((tier) => {
-          const price = isAnnual ? tier.annualMonthlyPrice : tier.monthlyPrice;
+          const displayPrice = isAnnual ? tier.annualMonthlyEquivalent : tier.monthlyPrice;
           return (
             <div
               key={tier.id}
-              className={`bg-card rounded-lg p-6 sm:p-7 shadow-card flex flex-col justify-between relative transition-all ${
+              className={`bg-card rounded-xl p-6 shadow-card flex flex-col justify-between relative transition-all ${
                 tier.popular
                   ? 'border-2 border-primary shadow-pop'
-                  : 'border border-border'
+                  : 'border border-border hover:border-slate-300 dark:hover:border-slate-700'
               }`}
             >
               {tier.popular && tier.badge && (
-                <div className="absolute -top-3 right-6 bg-primary text-white text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-xs">
+                <div className="absolute -top-3 right-6 bg-primary text-white text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5" />
                   {tier.badge}
                 </div>
               )}
@@ -109,25 +111,45 @@ export default function PricingPage() {
                   }`}>
                     {tier.name}
                   </span>
+                  
                   <div className="flex items-baseline gap-1 mt-2">
-                    <span className="text-4xl font-bold font-mono text-text tnum">
-                      ${price}
+                    <span className="text-3xl sm:text-4xl font-bold font-mono text-text tnum">
+                      ${displayPrice === 0 ? '0' : displayPrice.toFixed(displayPrice % 1 === 0 ? 0 : 2)}
                     </span>
                     <span className="text-xs text-muted font-mono">/ month</span>
                   </div>
-                  {isAnnual && (
-                    <span className="text-[11px] font-mono text-primary block mt-0.5">
-                      Billed annually (${price * 12}/yr)
+
+                  {tier.id !== 'free' && isAnnual && (
+                    <div className="mt-1 space-y-0.5">
+                      <span className="text-[11px] font-mono text-primary block font-medium">
+                        Billed annually (${tier.annualPrice}/year)
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 block">
+                        Save ${tier.annualSavings}/year
+                      </span>
+                    </div>
+                  )}
+
+                  {tier.id !== 'free' && !isAnnual && (
+                    <span className="text-[11px] font-mono text-muted block mt-1">
+                      Billed monthly (${tier.monthlyPrice}/month)
                     </span>
                   )}
-                  <p className="mt-2 text-xs text-muted leading-relaxed">
+
+                  {tier.id === 'free' && (
+                    <span className="text-[11px] font-mono text-muted block mt-1">
+                      Free forever, no credit card
+                    </span>
+                  )}
+
+                  <p className="mt-3 text-xs text-muted leading-relaxed min-h-[36px]">
                     {tier.tagline}
                   </p>
                 </div>
 
-                <div className="pt-2 border-t border-border">
+                <div className="pt-3 border-t border-border">
                   <span className="text-[11px] font-semibold text-text uppercase tracking-wider block mb-3 font-head">
-                    What is included:
+                    Included capabilities:
                   </span>
                   <ul className="space-y-2.5 text-xs text-muted">
                     {tier.features.map((feature, fIdx) => (
@@ -140,13 +162,13 @@ export default function PricingPage() {
                 </div>
               </div>
 
-              {/* Single Primary Button rule: only Agency card has primary CTA */}
+              {/* Action Button */}
               <div className="pt-6">
                 <Link
-                  href={tier.ctaHref}
+                  href={`${tier.ctaHref}${isAnnual ? '&billing=annual' : '&billing=monthly'}`}
                   className={`w-full h-10 flex items-center justify-center rounded-md text-xs font-medium transition-colors ${
                     tier.primaryCta
-                      ? 'bg-primary hover:bg-primary-hover text-white shadow-xs'
+                      ? 'bg-primary hover:bg-primary-hover text-white shadow-xs font-semibold'
                       : 'border border-border bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-text shadow-xs'
                   }`}
                 >
@@ -158,12 +180,12 @@ export default function PricingPage() {
         })}
       </div>
 
-      {/* 3. Cancel-anytime / refund note */}
-      <div className="p-4 rounded-md bg-card border border-border text-xs text-muted flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+      {/* 3. Reassurance Banner */}
+      <div className="p-4 rounded-lg bg-card border border-border text-xs text-muted flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
           <span>
-            <strong>Zero risk commitment:</strong> Cancel anytime with one click. 14-day refund policy [confirm policy].
+            <strong>Predictable SaaS Billing:</strong> All plans include automated SSRF protection, clean exports, and zero unexpected overage charges.
           </span>
         </div>
         <span className="font-mono text-[11px] text-muted">
@@ -171,35 +193,46 @@ export default function PricingPage() {
         </span>
       </div>
 
-      {/* 4. Full Feature Comparison Table with Sticky Header */}
+      {/* 4. Full Feature Comparison Table */}
       <div className="space-y-6 pt-4">
         <div className="text-center space-y-2 max-w-xl mx-auto">
           <h2 className="text-2xl font-bold font-head text-text">
             Compare all features across plans
           </h2>
           <p className="text-xs text-muted">
-            Detailed breakdown of crawling quotas, keyword intelligence, and agency deliverables.
+            Detailed breakdown of crawling allowances, keyword intelligence, and agency deliverables.
           </p>
         </div>
 
         <div className="bg-card rounded-lg border border-border shadow-card overflow-x-auto">
           <table className="w-full text-xs text-left border-collapse">
-            {/* Sticky Table Header */}
             <thead className="sticky top-16 z-10 bg-slate-50 dark:bg-slate-800/90 border-b border-border">
               <tr className="h-12 text-[11px] font-mono text-muted uppercase">
-                <th className="py-3 px-4 font-semibold w-1/3">Capability</th>
-                <th className="py-3 px-4 font-semibold text-center">Freelancer</th>
-                <th className="py-3 px-4 font-semibold text-center text-primary">Agency (Popular)</th>
-                <th className="py-3 px-4 font-semibold text-center">Team</th>
+                <th className="py-3 px-4 font-semibold w-1/4">Capability</th>
+                <th className="py-3 px-3 font-semibold text-center">Free</th>
+                <th className="py-3 px-3 font-semibold text-center">Freelancer</th>
+                <th className="py-3 px-3 font-semibold text-center text-primary">Agency (Popular)</th>
+                <th className="py-3 px-3 font-semibold text-center">Team</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border font-sans">
               {PRICING_CONFIG.comparisonRows.map((row, rIdx) => (
-                <tr key={rIdx} className="h-12 hover:bg-bg/60 transition-colors">
-                  <td className="py-2.5 px-4 font-medium text-text">
+                <tr key={rIdx} className="h-11 hover:bg-bg/60 transition-colors">
+                  <td className="py-2 px-4 font-medium text-text">
                     {row.feature}
                   </td>
-                  <td className="py-2.5 px-4 text-center font-mono text-muted">
+                  <td className="py-2 px-3 text-center font-mono text-muted">
+                    {typeof row.free === 'boolean' ? (
+                      row.free ? (
+                        <Check className="w-4 h-4 text-primary mx-auto" />
+                      ) : (
+                        <span className="text-muted/40 font-bold">—</span>
+                      )
+                    ) : (
+                      row.free
+                    )}
+                  </td>
+                  <td className="py-2 px-3 text-center font-mono text-muted">
                     {typeof row.freelancer === 'boolean' ? (
                       row.freelancer ? (
                         <Check className="w-4 h-4 text-primary mx-auto" />
@@ -210,7 +243,7 @@ export default function PricingPage() {
                       row.freelancer
                     )}
                   </td>
-                  <td className="py-2.5 px-4 text-center font-mono font-medium text-text bg-primary-tint/20">
+                  <td className="py-2 px-3 text-center font-mono font-medium text-text bg-primary-tint/20">
                     {typeof row.agency === 'boolean' ? (
                       row.agency ? (
                         <Check className="w-4 h-4 text-primary mx-auto" />
@@ -221,7 +254,7 @@ export default function PricingPage() {
                       row.agency
                     )}
                   </td>
-                  <td className="py-2.5 px-4 text-center font-mono text-muted">
+                  <td className="py-2 px-3 text-center font-mono text-muted">
                     {typeof row.team === 'boolean' ? (
                       row.team ? (
                         <Check className="w-4 h-4 text-primary mx-auto" />
@@ -239,11 +272,11 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* 5. Pricing FAQ (6 Questions) */}
+      {/* 5. Pricing FAQs */}
       <div className="space-y-6 pt-8 max-w-3xl mx-auto">
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold font-head text-text">
-            Pricing questions & answers
+            Frequently asked questions
           </h2>
         </div>
 
@@ -253,49 +286,27 @@ export default function PricingPage() {
             return (
               <div
                 key={idx}
-                className="bg-card rounded-md border border-border shadow-xs overflow-hidden"
+                className="bg-card rounded-lg border border-border p-4 shadow-card cursor-pointer transition-all"
+                onClick={() => setOpenFaq(isOpen ? null : idx)}
               >
-                <button
-                  onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full p-4 text-left flex items-center justify-between gap-4 text-sm font-semibold font-head text-text hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-                  aria-expanded={isOpen}
-                >
-                  <span>{faq.q}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <h3 className="text-sm font-semibold text-text font-head">
+                    {faq.q}
+                  </h3>
                   <ChevronDown
-                    className={`w-4 h-4 text-muted shrink-0 transition-transform duration-200 ${
+                    className={`w-4 h-4 text-muted transition-transform shrink-0 ${
                       isOpen ? 'rotate-180 text-primary' : ''
                     }`}
                   />
-                </button>
+                </div>
                 {isOpen && (
-                  <div className="px-4 pb-4 text-xs text-muted leading-relaxed border-t border-border pt-3">
+                  <p className="mt-2.5 text-xs text-muted leading-relaxed animate-in fade-in pt-2 border-t border-border">
                     {faq.a}
-                  </div>
+                  </p>
                 )}
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* 6. Final CTA */}
-      <div className="bg-card rounded-lg border border-border p-8 sm:p-12 text-center space-y-6 shadow-pop">
-        <div className="max-w-xl mx-auto space-y-3">
-          <h2 className="text-2xl sm:text-3xl font-bold font-head text-text">
-            Ready to automate your agency's SEO workflows?
-          </h2>
-          <p className="text-xs sm:text-sm text-muted">
-            Start with the free pilot today or choose an agency plan for high-volume client delivery.
-          </p>
-        </div>
-        <div className="pt-2">
-          <Link
-            href="/signup"
-            className="inline-flex items-center justify-center gap-2 h-10 px-6 bg-primary hover:bg-primary-hover text-white text-xs font-medium rounded-md shadow-xs transition-colors"
-          >
-            Start free
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
         </div>
       </div>
     </div>

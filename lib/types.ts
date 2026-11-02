@@ -2,12 +2,19 @@
 
 export type OrganizationRole = 'owner' | 'admin' | 'member' | 'viewer';
 
+export type PlanTier = 'free' | 'freelancer' | 'agency' | 'team' | 'solo' | 'enterprise';
+export type BillingCycle = 'monthly' | 'annual';
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete';
+
 export interface UserProfile {
   id: string;
   email: string;
   fullName: string;
   avatarUrl?: string;
   role: 'user' | 'admin' | 'superadmin';
+  userType?: 'freelancer' | 'agency' | 'in_house' | 'other';
+  companyName?: string;
+  timeZone?: string;
   createdAt: string;
 }
 
@@ -15,12 +22,54 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
-  plan: 'free' | 'solo' | 'agency' | 'enterprise';
+  plan: PlanTier;
   billingEmail?: string;
   maxWebsites: number;
   maxCrawledPagesPerAudit: number;
   maxAiAnalysesPerMonth: number;
   createdAt: string;
+}
+
+export interface Subscription {
+  id: string;
+  organizationId: string;
+  provider: 'lemon_squeezy' | 'paddle' | 'stripe' | 'manual' | 'free';
+  providerSubscriptionId?: string;
+  providerCustomerId?: string;
+  plan: PlanTier;
+  billingCycle: BillingCycle;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubscriptionEntitlements {
+  id: string;
+  organizationId: string;
+  plan: PlanTier;
+  maxWebsites: number;
+  maxCrawledPages: number;
+  maxSavedReports: number;
+  historyRetentionDays: number;
+  hasGscSync: boolean;
+  hasStrikingDistance: boolean;
+  hasTrafficDropEngine: boolean;
+  hasKeywordClustering: boolean;
+  hasTeamSeats: boolean;
+  hasApiAccess: boolean;
+  hasWhiteLabelReports: boolean;
+}
+
+export interface UsageRecord {
+  id: string;
+  organizationId: string;
+  metric: string;
+  periodMonth: string;
+  currentCount: number;
+  updatedAt: string;
 }
 
 export interface Website {
