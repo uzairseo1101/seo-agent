@@ -19,8 +19,7 @@ SET updated_at = NOW();
 
 -- 2. Clean Up Any Accidental Legacy Mock Records
 DELETE FROM public.websites
-WHERE id IN ('web-1', 'web-2', 'web-3')
-   OR domain IN ('saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk')
+WHERE domain IN ('saasflow.io', 'nordicclean.com', 'zenithlaw.co.uk')
    OR name IN ('SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners');
 
 -- 3. Relax / Update Websites RLS Policies
