@@ -58,6 +58,7 @@ test('Full End-to-End Customer Journey: Connect -> Analyze -> Discover -> Priori
 
   // Step 10: Generate Executive Client Report
   const clientReport = generateClientReportData(newSite.id);
+  assert.ok(clientReport, 'Must generate report');
   assert.strictEqual(clientReport.website.name, newSite.name);
   assert.ok(clientReport.scores.seoScore > 0);
   assert.ok(clientReport.methodologyStatement.length > 20);

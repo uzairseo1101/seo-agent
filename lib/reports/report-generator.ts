@@ -41,13 +41,24 @@ export interface FullClientReportData {
 }
 
 export function generateClientReportData(
-  websiteId: string,
+  websiteId?: string,
   startDate?: string,
   endDate?: string
-): FullClientReportData {
-  const website = storage.getWebsiteById(websiteId) || storage.getWebsites()[0];
+): FullClientReportData | null {
+  if (!websiteId) {
+    const cleanSites = storage.getWebsites().filter(
+      (w) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+    );
+    const defaultSite = cleanSites[0] || storage.getWebsites()[0];
+    if (!defaultSite) return null;
+    websiteId = defaultSite.id;
+  }
+
+  const website = storage.getWebsiteById(websiteId) || storage.getWebsites().find(w => w.id === websiteId);
   if (!website) {
-    throw new Error(`Website not found: ${websiteId}`);
+    return null;
   }
 
   const findings = storage.getFindings(website.id);

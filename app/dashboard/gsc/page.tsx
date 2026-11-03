@@ -17,8 +17,10 @@ import {
   ArrowRight,
   Filter,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-react';
+import { Website } from '@/lib/types';
 import {
   AreaChart,
   Area,
@@ -30,7 +32,13 @@ import {
 } from 'recharts';
 
 export default function GscPage() {
-  const websites = storage.getWebsites();
+  const [websites, setWebsites] = useState<Website[]>(() => {
+    return storage.getWebsites().filter(
+      (w) =>
+        !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+        !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+    );
+  });
   const [selectedWebId, setSelectedWebId] = useState(websites[0]?.id || '');
   const [dateRange, setDateRange] = useState<'7' | '28' | '90'>('28');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -38,9 +46,39 @@ export default function GscPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'queries' | 'pages'>('queries');
 
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchSites = async () => {
+      try {
+        const res = await fetch('/api/websites');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.websites) && mounted) {
+            const clean = data.websites.filter(
+              (w: Website) =>
+                !['web-1', 'web-2', 'web-3'].includes(w.id) &&
+                !['SaaSFlow Analytics', 'Nordic Clean Living', 'Zenith Legal Partners'].includes(w.name)
+            );
+            setWebsites(clean);
+            if (!selectedWebId && clean.length > 0) {
+              setSelectedWebId(clean[0].id);
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback
+      }
+    };
+    fetchSites();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedWebId]);
+
   const primary = websites.find(w => w.id === selectedWebId) || websites[0];
 
   const handleSyncData = async () => {
+    if (!primary) return;
     setIsSyncing(true);
     setSyncNotice(null);
     setSyncError(null);
@@ -92,7 +130,28 @@ export default function GscPage() {
       />
 
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Connection Status Card */}
+        {websites.length === 0 || !primary ? (
+          <div className="bg-card rounded-lg border border-border p-12 text-center max-w-xl mx-auto shadow-card space-y-4">
+            <div className="w-14 h-14 rounded-full bg-accent-tint text-accent mx-auto flex items-center justify-center">
+              <Search className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold font-head text-text">No Google Search Console Properties Connected</h3>
+            <p className="text-xs text-muted max-w-md mx-auto leading-relaxed">
+              Connect a website domain to link Google Search Console and begin syncing organic search performance metrics, impressions, and keyword rankings.
+            </p>
+            <div className="pt-2">
+              <Link
+                href="/dashboard/websites"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-md shadow-xs transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Connect Website</span>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Connection Status Card */}
         <div className="bg-card rounded-lg border border-border p-6 shadow-card flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-md bg-accent-tint border border-blue-200 flex items-center justify-center text-accent">
@@ -364,6 +423,8 @@ export default function GscPage() {
             </div>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
