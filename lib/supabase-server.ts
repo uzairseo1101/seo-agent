@@ -22,16 +22,16 @@ export const isServerSupabaseConfigured = Boolean(
 );
 
 /**
- * Creates an administrative Supabase client using the SERVICE_ROLE_KEY (or anon key fallback).
+ * Creates an administrative Supabase client using the SERVICE_ROLE_KEY.
+ * Only returns a client if a true privileged service key is configured.
  * NEVER expose this client to the browser.
  */
 export function createAdminClient(): SupabaseClient | null {
-  const key = supabaseServiceRoleKey || supabaseAnonKey;
-  if (!supabaseUrl || !key || supabaseUrl.includes('your-project')) {
+  if (!supabaseUrl || !supabaseServiceRoleKey || supabaseUrl.includes('your-project')) {
     return null;
   }
 
-  return createClient(supabaseUrl, key, {
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,

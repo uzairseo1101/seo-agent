@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/admin-client';
 import {
   FileSearch,
   RefreshCw,
@@ -21,7 +22,7 @@ export default function AdminAuditsPage() {
   const fetchAudits = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/audits');
+      const res = await adminFetch('/api/admin/audits');
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.audits) {

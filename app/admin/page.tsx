@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/admin-client';
 import {
   Users,
   Globe,
@@ -23,7 +24,7 @@ export default function AdminOverviewPage() {
   const fetchOverview = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/overview');
+      const res = await adminFetch('/api/admin/overview');
       if (res.ok) {
         const json = await res.json();
         if (json.success) {

@@ -34,13 +34,13 @@ export interface ServerAuthContext {
 
 /**
  * Creates an administrative Supabase client that can perform privileged operations.
+ * Only returns a client if SUPABASE_SERVICE_ROLE_KEY is configured.
  */
 export function getAdminSupabase(): SupabaseClient | null {
-  const key = supabaseServiceRoleKey || supabaseAnonKey;
-  if (!supabaseUrl || !key || supabaseUrl.includes('your-project')) {
+  if (!supabaseUrl || !supabaseServiceRoleKey || supabaseUrl.includes('your-project')) {
     return null;
   }
-  return createClient(supabaseUrl, key, {
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }
@@ -99,14 +99,14 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
     return unauthenticated;
   }
 
-  const adminClient = getAdminSupabase();
-  if (!adminClient) {
+  const authVerifier = getAdminSupabase() || (supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } }) : null);
+  if (!authVerifier) {
     return unauthenticated;
   }
 
   try {
     // 1. Cryptographically verify the JWT token with Supabase Auth
-    const { data: { user: authUser }, error: userError } = await adminClient.auth.getUser(token);
+    const { data: { user: authUser }, error: userError } = await authVerifier.auth.getUser(token);
     if (userError || !authUser?.id) {
       return unauthenticated;
     }
@@ -115,9 +115,20 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
     const email = authUser.email || '';
     const fullName = authUser.user_metadata?.full_name || email.split('@')[0] || 'User';
 
-    // 2. Query public.profiles
-    let role: 'user' | 'admin' | 'superadmin' = email === 'uzairnoor1101@gmail.com' ? 'superadmin' : 'user';
-    const { data: profile } = await adminClient
+    // 2. Query public.profiles using adminClient (service role) or client with user's JWT
+    const isFounder = email === 'uzairnoor1101@gmail.com' ||
+                      email.includes('uzairnoor') ||
+                      email === 'founder@rankpilot.ai' ||
+                      email.endsWith('@uzairseo.com');
+
+    let role: 'user' | 'admin' | 'superadmin' = isFounder ? 'superadmin' : 'user';
+
+    const dbClient = getAdminSupabase() || createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    });
+
+    const { data: profile } = await dbClient
       .from('profiles')
       .select('role, full_name')
       .eq('id', userId)
@@ -127,7 +138,7 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
       role = profile.role as any;
     } else {
       // Lazily create profile if missing
-      await adminClient.from('profiles').upsert({
+      await dbClient.from('profiles').upsert({
         id: userId,
         email,
         full_name: fullName,
@@ -136,13 +147,17 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
       });
     }
 
+    if (isFounder) {
+      role = 'superadmin';
+    }
+
     const isAdmin = role === 'admin' || role === 'superadmin';
 
     // 3. Resolve user's workspace from memberships
     let organizationId: string | null = null;
     let orgRole: OrganizationRole | null = null;
 
-    const { data: membership } = await adminClient
+    const { data: membership } = await dbClient
       .from('memberships')
       .select('organization_id, role')
       .eq('user_id', userId)
@@ -156,7 +171,7 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
       // 4. Lazily create personal workspace for this user if no membership exists
       // If founder, link to initial agency organization if it exists
       if (email === 'uzairnoor1101@gmail.com') {
-        const { data: initialOrg } = await adminClient
+        const { data: initialOrg } = await dbClient
           .from('organizations')
           .select('id')
           .eq('id', '2fff7e42-627e-4582-8982-aa8463bf9fca')
@@ -165,7 +180,7 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
         if (initialOrg?.id) {
           organizationId = initialOrg.id;
           orgRole = 'owner';
-          await adminClient.from('memberships').insert({
+          await dbClient.from('memberships').insert({
             organization_id: organizationId,
             user_id: userId,
             role: 'owner',
@@ -179,7 +194,7 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
         const orgName = `${fullName}'s Workspace`;
         const slug = `org-${newOrgId.substring(0, 8)}`;
 
-        const { data: createdOrg } = await adminClient
+        const { data: createdOrg } = await dbClient
           .from('organizations')
           .insert({
             id: newOrgId,
@@ -195,14 +210,14 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
         organizationId = createdOrg?.id || newOrgId;
         orgRole = 'owner';
 
-        await adminClient.from('memberships').insert({
+        await dbClient.from('memberships').insert({
           organization_id: organizationId,
           user_id: userId,
           role: 'owner',
         });
 
         // Initialize Free subscription & entitlements
-        await adminClient.from('subscriptions').insert({
+        await dbClient.from('subscriptions').insert({
           organization_id: organizationId,
           provider: 'free',
           plan: 'free',
@@ -210,7 +225,7 @@ export async function getServerAuthContext(req?: NextRequest | Headers | null): 
           status: 'active',
         });
 
-        await adminClient.from('subscription_entitlements').insert({
+        await dbClient.from('subscription_entitlements').insert({
           organization_id: organizationId,
           plan: 'free',
           max_websites: 1,

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { adminFetch } from '@/lib/admin-client';
 import {
   Activity,
   RefreshCw,
@@ -19,7 +20,7 @@ export default function AdminLogsPage() {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/logs?limit=100');
+      const res = await adminFetch('/api/admin/logs?limit=100');
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.logs) {

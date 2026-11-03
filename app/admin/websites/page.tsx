@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/admin-client';
 import {
   Globe,
   ExternalLink,
@@ -21,7 +22,7 @@ export default function AdminWebsitesPage() {
   const fetchWebsites = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/websites');
+      const res = await adminFetch('/api/admin/websites');
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.websites) {
@@ -44,7 +45,7 @@ export default function AdminWebsitesPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/admin/websites?id=${id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/admin/websites?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setWebsites(prev => prev.filter(w => w.id !== id));
       }

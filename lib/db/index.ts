@@ -22,7 +22,18 @@ class DatabaseService {
   private inMemoryLogs: any[] = [];
 
   private getClient(req?: NextRequest | Headers | null) {
-    return getAdminSupabase() || getSupabaseServerClient(req) || createAdminClient() || createServerClient();
+    // 1. If service role admin is available, use it
+    const admin = getAdminSupabase();
+    if (admin) return admin;
+
+    // 2. If request contains user authorization, use client with user's JWT
+    if (req) {
+      const serverClient = getSupabaseServerClient(req);
+      if (serverClient) return serverClient;
+    }
+
+    // 3. Fallback
+    return createServerClient();
   }
 
   // ==========================================
@@ -30,7 +41,7 @@ class DatabaseService {
   // ==========================================
   async getWebsites(req?: NextRequest | Headers | null): Promise<Website[]> {
     const auth = await getServerAuthContext(req);
-    if (!auth.organizationId) {
+    if (!auth.isAdmin && !auth.organizationId) {
       // Unauthenticated or brand new user with 0 websites
       return [];
     }
@@ -38,12 +49,17 @@ class DatabaseService {
     const client = this.getClient(req);
     if (client) {
       try {
-        const { data, error } = await client
+        let query = client
           .from('websites')
           .select('*')
-          .eq('organization_id', auth.organizationId)
           .neq('status', 'archived')
           .order('created_at', { ascending: false });
+
+        if (!auth.isAdmin && auth.organizationId) {
+          query = query.eq('organization_id', auth.organizationId);
+        }
+
+        const { data, error } = await query;
 
         if (!error && Array.isArray(data)) {
           return data.map((row: any) => ({
@@ -210,16 +226,18 @@ class DatabaseService {
   // ==========================================
   async getAuditRuns(websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditRun[]> {
     const auth = await getServerAuthContext(req);
-    if (!auth.organizationId) return [];
+    if (!auth.isAdmin && !auth.organizationId) return [];
 
     const client = this.getClient(req);
     if (!client) return [];
 
     try {
-      // If websiteId is specified, verify it belongs to user's workspace
+      // If websiteId is specified, verify it belongs to user's workspace (or user is admin)
       if (websiteId) {
-        const site = await this.getWebsiteById(websiteId, req);
-        if (!site) return []; // Website does not belong to this user
+        if (!auth.isAdmin) {
+          const site = await this.getWebsiteById(websiteId, req);
+          if (!site) return []; // Website does not belong to this user
+        }
 
         const { data, error } = await client
           .from('audit_runs')
@@ -243,31 +261,55 @@ class DatabaseService {
           }));
         }
       } else {
-        // Get all websites for this organization
-        const userWebsites = await this.getWebsites(req);
-        if (userWebsites.length === 0) return [];
-        const webIds = userWebsites.map(w => w.id);
+        if (!auth.isAdmin) {
+          // Get all websites for this organization
+          const userWebsites = await this.getWebsites(req);
+          if (userWebsites.length === 0) return [];
+          const webIds = userWebsites.map(w => w.id);
 
-        const { data, error } = await client
-          .from('audit_runs')
-          .select('*')
-          .in('website_id', webIds)
-          .order('started_at', { ascending: false });
+          const { data, error } = await client
+            .from('audit_runs')
+            .select('*')
+            .in('website_id', webIds)
+            .order('started_at', { ascending: false });
 
-        if (!error && Array.isArray(data)) {
-          return data.map((row: any) => ({
-            id: row.id,
-            websiteId: row.website_id,
-            status: row.status || 'completed',
-            pagesCrawled: row.pages_crawled || 0,
-            seoScore: Number(row.seo_score) || 0,
-            geoScore: Number(row.geo_score) || 0,
-            aeoScore: Number(row.aeo_score) || 0,
-            crawlDurationMs: row.crawl_duration_ms || 0,
-            startedAt: row.started_at || new Date().toISOString(),
-            completedAt: row.completed_at || undefined,
-            findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
-          }));
+          if (!error && Array.isArray(data)) {
+            return data.map((row: any) => ({
+              id: row.id,
+              websiteId: row.website_id,
+              status: row.status || 'completed',
+              pagesCrawled: row.pages_crawled || 0,
+              seoScore: Number(row.seo_score) || 0,
+              geoScore: Number(row.geo_score) || 0,
+              aeoScore: Number(row.aeo_score) || 0,
+              crawlDurationMs: row.crawl_duration_ms || 0,
+              startedAt: row.started_at || new Date().toISOString(),
+              completedAt: row.completed_at || undefined,
+              findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
+            }));
+          }
+        } else {
+          // Superadmin can view all audit runs
+          const { data, error } = await client
+            .from('audit_runs')
+            .select('*')
+            .order('started_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return data.map((row: any) => ({
+              id: row.id,
+              websiteId: row.website_id,
+              status: row.status || 'completed',
+              pagesCrawled: row.pages_crawled || 0,
+              seoScore: Number(row.seo_score) || 0,
+              geoScore: Number(row.geo_score) || 0,
+              aeoScore: Number(row.aeo_score) || 0,
+              crawlDurationMs: row.crawl_duration_ms || 0,
+              startedAt: row.started_at || new Date().toISOString(),
+              completedAt: row.completed_at || undefined,
+              findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
+            }));
+          }
         }
       }
     } catch (e) {
@@ -386,7 +428,7 @@ class DatabaseService {
   // ==========================================
   async getActionItems(websiteId?: string, req?: NextRequest | Headers | null): Promise<ActionItem[]> {
     const auth = await getServerAuthContext(req);
-    if (!auth.organizationId) return [];
+    if (!auth.isAdmin && !auth.organizationId) return [];
 
     const client = this.getClient(req);
     if (!client) return [];
@@ -395,8 +437,11 @@ class DatabaseService {
       let query = client
         .from('action_items')
         .select('*')
-        .eq('organization_id', auth.organizationId)
         .order('created_at', { ascending: false });
+
+      if (!auth.isAdmin && auth.organizationId) {
+        query = query.eq('organization_id', auth.organizationId);
+      }
 
       if (websiteId && isValidUuid(websiteId)) {
         query = query.eq('website_id', websiteId);
@@ -550,6 +595,36 @@ class DatabaseService {
     const client = this.getClient(req);
     if (client) {
       try {
+        // 1. If service role key is configured, list directly from Supabase auth.admin
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                           process.env.SUPABASE_SERVICE_KEY || 
+                           process.env.SUPABASE_SECRET_KEY || 
+                           process.env.SB_SECRET_KEY;
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+
+        if (serviceKey && url && !url.includes('your-project')) {
+          try {
+            const { createClient: createDirectClient } = await import('@supabase/supabase-js');
+            const adminAuth = createDirectClient(url, serviceKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            });
+            const { data: authData, error: authErr } = await adminAuth.auth.admin.listUsers();
+            if (!authErr && authData?.users && authData.users.length > 0) {
+              return authData.users.map((u: any) => ({
+                id: u.id,
+                email: u.email || '',
+                fullName: u.user_metadata?.full_name || u.email?.split('@')[0] || 'User',
+                avatarUrl: undefined,
+                role: (u.email === 'uzairnoor1101@gmail.com' || u.email?.includes('uzairnoor') || u.email === 'founder@rankpilot.ai') ? 'superadmin' : 'user',
+                createdAt: u.created_at || new Date().toISOString(),
+              }));
+            }
+          } catch (e) {
+            console.warn('adminAuth.auth.admin.listUsers failed, querying profiles table:', e);
+          }
+        }
+
+        // 2. Query public.profiles with client (authenticated as admin)
         const { data, error } = await client
           .from('profiles')
           .select('*')

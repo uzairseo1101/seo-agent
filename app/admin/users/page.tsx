@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/admin-client';
 import {
   Users,
   Search,
@@ -26,7 +27,7 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await adminFetch('/api/admin/users');
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.users) {
@@ -47,7 +48,7 @@ export default function AdminUsersPage() {
   const handleToggleRole = async (user: UserProfile) => {
     const newRole = user.role === 'admin' || user.role === 'superadmin' ? 'user' : 'admin';
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await adminFetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: user.id, role: newRole }),
@@ -67,7 +68,7 @@ export default function AdminUsersPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setUsers(prev => prev.filter(u => u.id !== id));
         setActionNotice(`User ${email} was deleted.`);
