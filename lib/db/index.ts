@@ -12,6 +12,10 @@ import {
   TaskStatus,
   FindingCategory,
   TaskPriority,
+  CrawlJob,
+  CrawlJobStatus,
+  FindingSeverity,
+  FindingType,
 } from '@/lib/types';
 
 /**
@@ -222,6 +226,191 @@ class DatabaseService {
   }
 
   // ==========================================
+  // CRAWL JOBS (Durable Background Processing)
+  // ==========================================
+  async createCrawlJob(job: Partial<CrawlJob>, req?: NextRequest | Headers | null): Promise<CrawlJob> {
+    const auth = await getServerAuthContext(req);
+    const orgId = auth.organizationId || job.organizationId || (req ? null : '00000000-0000-0000-0000-000000000001');
+    const jobId = (job.id && isValidUuid(job.id)) ? job.id : generateUuid();
+
+    const client = this.getClient(req);
+    const newJob: CrawlJob = {
+      id: jobId,
+      websiteId: job.websiteId || '',
+      auditRunId: job.auditRunId || generateUuid(),
+      organizationId: orgId || '',
+      status: job.status || 'pending',
+      progressPercent: job.progressPercent || 0,
+      currentStage: job.currentStage || 'Initialized',
+      urlsDiscovered: job.urlsDiscovered || 0,
+      urlsCrawled: job.urlsCrawled || 0,
+      urlsRemaining: job.urlsRemaining || 0,
+      urlsFailed: job.urlsFailed || 0,
+      maxPages: job.maxPages || 10,
+      maxDepth: job.maxDepth || 2,
+      crawlOptions: job.crawlOptions || {},
+      discoveredUrls: job.discoveredUrls || [],
+      crawledUrls: job.crawledUrls || [],
+      failedUrls: job.failedUrls || [],
+      errorMessage: job.errorMessage,
+      startedAt: job.startedAt || new Date().toISOString(),
+      createdAt: job.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (client && isValidUuid(newJob.websiteId)) {
+      try {
+        await client.from('crawl_jobs').insert({
+          id: newJob.id,
+          website_id: newJob.websiteId,
+          audit_run_id: isValidUuid(newJob.auditRunId) ? newJob.auditRunId : null,
+          organization_id: newJob.organizationId,
+          status: newJob.status,
+          progress_percent: newJob.progressPercent,
+          current_stage: newJob.currentStage,
+          urls_discovered: newJob.urlsDiscovered,
+          urls_crawled: newJob.urlsCrawled,
+          urls_remaining: newJob.urlsRemaining,
+          urls_failed: newJob.urlsFailed,
+          max_pages: newJob.maxPages,
+          max_depth: newJob.maxDepth,
+          crawl_options: newJob.crawlOptions,
+          discovered_urls: newJob.discoveredUrls,
+          crawled_urls: newJob.crawledUrls,
+          failed_urls: newJob.failedUrls,
+          error_message: newJob.errorMessage,
+          started_at: newJob.startedAt,
+          created_at: newJob.createdAt,
+          updated_at: newJob.updatedAt,
+        });
+      } catch (e: any) {
+        console.warn('Database createCrawlJob exception:', e.message);
+      }
+    }
+
+    storage.saveCrawlJob(newJob);
+    return newJob;
+  }
+
+  async getCrawlJobById(id: string, req?: NextRequest | Headers | null): Promise<CrawlJob | null> {
+    if (!id) return null;
+    const client = this.getClient(req);
+    if (client && isValidUuid(id)) {
+      try {
+        const { data, error } = await client
+          .from('crawl_jobs')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+
+        if (!error && data) {
+          return {
+            id: data.id,
+            websiteId: data.website_id,
+            auditRunId: data.audit_run_id,
+            organizationId: data.organization_id,
+            status: data.status,
+            progressPercent: data.progress_percent || 0,
+            currentStage: data.current_stage || '',
+            urlsDiscovered: data.urls_discovered || 0,
+            urlsCrawled: data.urls_crawled || 0,
+            urlsRemaining: data.urls_remaining || 0,
+            urlsFailed: data.urls_failed || 0,
+            maxPages: data.max_pages || 10,
+            maxDepth: data.max_depth || 2,
+            crawlOptions: data.crawl_options || {},
+            discoveredUrls: data.discovered_urls || [],
+            crawledUrls: data.crawled_urls || [],
+            failedUrls: data.failed_urls || [],
+            errorMessage: data.error_message,
+            startedAt: data.started_at,
+            completedAt: data.completed_at,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          };
+        }
+      } catch (e: any) {
+        console.warn('Database getCrawlJobById exception:', e.message);
+      }
+    }
+    return storage.getCrawlJobById(id) || null;
+  }
+
+  async getLatestCrawlJob(websiteId: string, req?: NextRequest | Headers | null): Promise<CrawlJob | null> {
+    if (!websiteId) return null;
+    const client = this.getClient(req);
+    if (client && isValidUuid(websiteId)) {
+      try {
+        const { data, error } = await client
+          .from('crawl_jobs')
+          .select('*')
+          .eq('website_id', websiteId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          return {
+            id: data.id,
+            websiteId: data.website_id,
+            auditRunId: data.audit_run_id,
+            organizationId: data.organization_id,
+            status: data.status,
+            progressPercent: data.progress_percent || 0,
+            currentStage: data.current_stage || '',
+            urlsDiscovered: data.urls_discovered || 0,
+            urlsCrawled: data.urls_crawled || 0,
+            urlsRemaining: data.urls_remaining || 0,
+            urlsFailed: data.urls_failed || 0,
+            maxPages: data.max_pages || 10,
+            maxDepth: data.max_depth || 2,
+            crawlOptions: data.crawl_options || {},
+            discoveredUrls: data.discovered_urls || [],
+            crawledUrls: data.crawled_urls || [],
+            failedUrls: data.failed_urls || [],
+            errorMessage: data.error_message,
+            startedAt: data.started_at,
+            completedAt: data.completed_at,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          };
+        }
+      } catch (e: any) {
+        console.warn('Database getLatestCrawlJob exception:', e.message);
+      }
+    }
+    return storage.getLatestCrawlJob(websiteId) || null;
+  }
+
+  async updateCrawlJob(id: string, updates: Partial<CrawlJob>, req?: NextRequest | Headers | null): Promise<CrawlJob | null> {
+    if (!id) return null;
+    const client = this.getClient(req);
+    if (client && isValidUuid(id)) {
+      try {
+        const dbUpdates: any = { updated_at: new Date().toISOString() };
+        if (updates.status !== undefined) dbUpdates.status = updates.status;
+        if (updates.progressPercent !== undefined) dbUpdates.progress_percent = updates.progressPercent;
+        if (updates.currentStage !== undefined) dbUpdates.current_stage = updates.currentStage;
+        if (updates.urlsDiscovered !== undefined) dbUpdates.urls_discovered = updates.urlsDiscovered;
+        if (updates.urlsCrawled !== undefined) dbUpdates.urls_crawled = updates.urlsCrawled;
+        if (updates.urlsRemaining !== undefined) dbUpdates.urls_remaining = updates.urlsRemaining;
+        if (updates.urlsFailed !== undefined) dbUpdates.urls_failed = updates.urlsFailed;
+        if (updates.discoveredUrls !== undefined) dbUpdates.discovered_urls = updates.discoveredUrls;
+        if (updates.crawledUrls !== undefined) dbUpdates.crawled_urls = updates.crawledUrls;
+        if (updates.failedUrls !== undefined) dbUpdates.failed_urls = updates.failedUrls;
+        if (updates.errorMessage !== undefined) dbUpdates.error_message = updates.errorMessage;
+        if (updates.completedAt !== undefined) dbUpdates.completed_at = updates.completedAt;
+        if (updates.auditRunId !== undefined && isValidUuid(updates.auditRunId)) dbUpdates.audit_run_id = updates.auditRunId;
+
+        await client.from('crawl_jobs').update(dbUpdates).eq('id', id);
+      } catch (e: any) {
+        console.warn('Database updateCrawlJob exception:', e.message);
+      }
+    }
+    return storage.updateCrawlJob(id, updates) || null;
+  }
+
+  // ==========================================
   // AUDITS & FINDINGS (Scoped by Authorized Website)
   // ==========================================
   async getAuditRuns(websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditRun[]> {
@@ -249,15 +438,24 @@ class DatabaseService {
           return data.map((row: any) => ({
             id: row.id,
             websiteId: row.website_id,
+            organizationId: row.organization_id,
             status: row.status || 'completed',
             pagesCrawled: row.pages_crawled || 0,
+            pagesDiscovered: row.urls_discovered || row.pages_discovered || row.pages_crawled || 0,
+            pagesFailed: row.pages_failed || 0,
             seoScore: Number(row.seo_score) || 0,
             geoScore: Number(row.geo_score) || 0,
             aeoScore: Number(row.aeo_score) || 0,
+            technicalScore: Number(row.technical_score) || Number(row.seo_score) || 0,
+            isProvisionalScore: Boolean(row.is_provisional_score),
             crawlDurationMs: row.crawl_duration_ms || 0,
+            scoreBreakdown: row.score_breakdown || undefined,
+            crawlLimits: row.crawl_limits || undefined,
+            auditVersion: row.audit_version || '2.0',
+            scoringVersion: row.scoring_version || '2.0',
             startedAt: row.started_at || new Date().toISOString(),
             completedAt: row.completed_at || undefined,
-            findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
+            findingsCount: row.findings_count || { critical: 0, high: 0, medium: 0, low: 0 },
           }));
         }
       } else {
@@ -277,15 +475,24 @@ class DatabaseService {
             return data.map((row: any) => ({
               id: row.id,
               websiteId: row.website_id,
+              organizationId: row.organization_id,
               status: row.status || 'completed',
               pagesCrawled: row.pages_crawled || 0,
+              pagesDiscovered: row.urls_discovered || row.pages_discovered || row.pages_crawled || 0,
+              pagesFailed: row.pages_failed || 0,
               seoScore: Number(row.seo_score) || 0,
               geoScore: Number(row.geo_score) || 0,
               aeoScore: Number(row.aeo_score) || 0,
+              technicalScore: Number(row.technical_score) || Number(row.seo_score) || 0,
+              isProvisionalScore: Boolean(row.is_provisional_score),
               crawlDurationMs: row.crawl_duration_ms || 0,
+              scoreBreakdown: row.score_breakdown || undefined,
+              crawlLimits: row.crawl_limits || undefined,
+              auditVersion: row.audit_version || '2.0',
+              scoringVersion: row.scoring_version || '2.0',
               startedAt: row.started_at || new Date().toISOString(),
               completedAt: row.completed_at || undefined,
-              findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
+              findingsCount: row.findings_count || { critical: 0, high: 0, medium: 0, low: 0 },
             }));
           }
         } else {
@@ -299,15 +506,24 @@ class DatabaseService {
             return data.map((row: any) => ({
               id: row.id,
               websiteId: row.website_id,
+              organizationId: row.organization_id,
               status: row.status || 'completed',
               pagesCrawled: row.pages_crawled || 0,
+              pagesDiscovered: row.urls_discovered || row.pages_discovered || row.pages_crawled || 0,
+              pagesFailed: row.pages_failed || 0,
               seoScore: Number(row.seo_score) || 0,
               geoScore: Number(row.geo_score) || 0,
               aeoScore: Number(row.aeo_score) || 0,
+              technicalScore: Number(row.technical_score) || Number(row.seo_score) || 0,
+              isProvisionalScore: Boolean(row.is_provisional_score),
               crawlDurationMs: row.crawl_duration_ms || 0,
+              scoreBreakdown: row.score_breakdown || undefined,
+              crawlLimits: row.crawl_limits || undefined,
+              auditVersion: row.audit_version || '2.0',
+              scoringVersion: row.scoring_version || '2.0',
               startedAt: row.started_at || new Date().toISOString(),
               completedAt: row.completed_at || undefined,
-              findingsCount: { critical: 0, high: 0, medium: 0, low: 0 },
+              findingsCount: row.findings_count || { critical: 0, high: 0, medium: 0, low: 0 },
             }));
           }
         }
@@ -315,15 +531,17 @@ class DatabaseService {
     } catch (e) {
       console.error('Database getAuditRuns error:', e);
     }
-    return [];
+    return storage.getAuditRuns(websiteId);
   }
 
   async getFindings(runId?: string, websiteId?: string, req?: NextRequest | Headers | null): Promise<AuditFinding[]> {
     const auth = await getServerAuthContext(req);
-    if (!auth.organizationId) return [];
+    if (!auth.organizationId) {
+      return storage.getFindings(websiteId);
+    }
 
     const client = this.getClient(req);
-    if (!client) return [];
+    if (!client) return storage.getFindings(websiteId);
 
     try {
       if (websiteId) {
@@ -340,24 +558,36 @@ class DatabaseService {
       }
 
       const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         return data.map((row: any) => ({
           id: row.id,
           auditRunId: row.audit_run_id,
           websiteId: row.website_id,
+          organizationId: row.organization_id,
           url: row.url,
           category: row.category as FindingCategory,
+          findingType: (row.finding_type as FindingType) || 'confirmed_error',
           issueType: row.issue_type,
-          severity: row.severity,
+          severity: (row.severity as FindingSeverity) || 'medium',
+          priority: (row.priority as TaskPriority) || 'medium',
           title: row.title,
           description: row.description,
+          whyItMatters: row.why_it_matters || undefined,
           recommendation: row.recommendation,
+          implementationSteps: Array.isArray(row.implementation_steps) ? row.implementation_steps : [],
+          verificationCriteria: row.verification_criteria || undefined,
+          estimatedEffort: row.estimated_effort || 'moderate',
           confidenceLevel: row.confidence_level || 'high',
           detectionMethod: row.detection_method,
           evidence: {
             expected: row.expected_condition || row.recommendation || 'Compliant with search standards',
             actual: row.actual_condition || row.description || 'Defect detected during crawl',
+            snippet: row.snippet || undefined,
+            statusCode: row.status_code || undefined,
+            headers: row.http_headers || undefined,
           },
+          firstDetectedAt: row.first_detected_at || row.created_at,
+          lastDetectedAt: row.last_detected_at || row.created_at,
           isResolved: row.is_resolved || false,
           createdAt: row.created_at || new Date().toISOString(),
         }));
@@ -365,58 +595,96 @@ class DatabaseService {
     } catch (e) {
       console.error('Database getFindings error:', e);
     }
-    return [];
+    return storage.getFindings(websiteId);
   }
 
   async saveAuditRun(run: AuditRun, findings: AuditFinding[], req?: NextRequest | Headers | null): Promise<void> {
     const client = this.getClient(req);
-    if (!client) return;
+    const runId = isValidUuid(run.id) ? run.id : generateUuid();
 
-    try {
-      const runId = isValidUuid(run.id) ? run.id : generateUuid();
-      await client.from('audit_runs').insert({
-        id: runId,
-        website_id: run.websiteId,
-        status: run.status,
-        pages_crawled: run.pagesCrawled,
-        seo_score: run.seoScore,
-        geo_score: run.geoScore,
-        aeo_score: run.aeoScore,
-        crawl_duration_ms: run.crawlDurationMs,
-        started_at: run.startedAt,
-        completed_at: run.completedAt,
-      });
+    // 1. In-memory / storage update
+    storage.saveAuditRun({ ...run, id: runId }, findings);
 
-      await client.from('websites').update({
-        latest_seo_score: run.seoScore,
-        latest_geo_score: run.geoScore,
-        latest_aeo_score: run.aeoScore,
-        last_audited_at: run.completedAt,
-      }).eq('id', run.websiteId);
-
-      if (findings.length > 0) {
-        const findingRows = findings.map(f => ({
-          id: isValidUuid(f.id) ? f.id : generateUuid(),
-          audit_run_id: runId,
+    // 2. Database update
+    if (client && isValidUuid(run.websiteId)) {
+      try {
+        await client.from('audit_runs').upsert({
+          id: runId,
           website_id: run.websiteId,
-          url: f.url,
-          category: f.category,
-          issue_type: f.issueType,
-          severity: f.severity,
-          title: f.title,
-          description: f.description,
-          recommendation: f.recommendation,
-          confidence_level: f.confidenceLevel,
-          detection_method: f.detectionMethod,
-          is_resolved: f.isResolved,
-        }));
-        await client.from('audit_findings').insert(findingRows);
+          organization_id: run.organizationId || null,
+          status: run.status,
+          pages_crawled: run.pagesCrawled,
+          pages_failed: run.pagesFailed || 0,
+          urls_discovered: run.pagesDiscovered || run.pagesCrawled,
+          seo_score: run.seoScore,
+          geo_score: run.geoScore,
+          aeo_score: run.aeoScore,
+          technical_score: run.technicalScore || run.seoScore,
+          is_provisional_score: run.isProvisionalScore || false,
+          crawl_duration_ms: run.crawlDurationMs,
+          score_breakdown: run.scoreBreakdown || {},
+          crawl_limits: run.crawlLimits || {},
+          audit_version: run.auditVersion || '2.0',
+          scoring_version: run.scoringVersion || '2.0',
+          started_at: run.startedAt,
+          completed_at: run.completedAt || new Date().toISOString(),
+        });
+
+        await client.from('websites').update({
+          latest_seo_score: run.seoScore,
+          latest_geo_score: run.geoScore,
+          latest_aeo_score: run.aeoScore,
+          last_audited_at: run.completedAt || new Date().toISOString(),
+        }).eq('id', run.websiteId);
+
+        // Score history tracking
+        try {
+          await client.from('score_history').insert({
+            id: generateUuid(),
+            website_id: run.websiteId,
+            audit_run_id: runId,
+            seo_score: run.seoScore,
+            geo_score: run.geoScore,
+            aeo_score: run.aeoScore,
+            recorded_at: run.completedAt || new Date().toISOString(),
+          });
+        } catch {
+          // Ignore if score_history insert fails
+        }
+
+        if (findings.length > 0) {
+          const findingRows = findings.map(f => ({
+            id: isValidUuid(f.id) ? f.id : generateUuid(),
+            audit_run_id: runId,
+            website_id: run.websiteId,
+            organization_id: run.organizationId || null,
+            url: f.url,
+            category: f.category,
+            finding_type: f.findingType || 'confirmed_error',
+            issue_type: f.issueType,
+            severity: f.severity,
+            priority: f.priority || (f.severity === 'critical' ? 'critical' : f.severity === 'high' ? 'high' : 'medium'),
+            title: f.title,
+            description: f.description,
+            why_it_matters: f.whyItMatters || null,
+            recommendation: f.recommendation,
+            implementation_steps: f.implementationSteps || [],
+            verification_criteria: f.verificationCriteria || null,
+            estimated_effort: f.estimatedEffort || 'moderate',
+            confidence_level: f.confidenceLevel,
+            detection_method: f.detectionMethod,
+            is_resolved: f.isResolved,
+            first_detected_at: f.firstDetectedAt || new Date().toISOString(),
+            last_detected_at: f.lastDetectedAt || new Date().toISOString(),
+          }));
+          await client.from('audit_findings').insert(findingRows);
+        }
+      } catch (e) {
+        console.error('Database saveAuditRun error:', e);
       }
-    } catch (e) {
-      console.error('Database saveAuditRun error:', e);
     }
 
-    await this.logActivity('audit_executed', 'audit_run', run.id, {
+    await this.logActivity('audit_executed', 'audit_run', runId, {
       websiteId: run.websiteId,
       seoScore: run.seoScore,
       findingsCount: findings.length,
@@ -485,6 +753,55 @@ class DatabaseService {
 
     const taskId = (item.id && isValidUuid(item.id)) ? item.id : generateUuid();
     const client = this.getClient(req);
+    const targetFindingId = item.findingId || (item.sourceType === 'audit_finding' ? item.sourceId : undefined);
+
+    // Prevent duplicate tasks for the same unresolved finding
+    if (client && item.websiteId && targetFindingId && isValidUuid(targetFindingId)) {
+      try {
+        const { data: existing } = await client
+          .from('action_items')
+          .select('*')
+          .eq('website_id', item.websiteId)
+          .or(`finding_id.eq.${targetFindingId},source_id.eq.${targetFindingId}`)
+          .in('status', ['todo', 'in_progress'])
+          .maybeSingle();
+
+        if (existing) {
+          return {
+            id: existing.id,
+            organizationId: existing.organization_id,
+            websiteId: existing.website_id,
+            sourceType: existing.source_type,
+            sourceId: existing.source_id,
+            findingId: existing.finding_id || existing.source_id,
+            auditRunId: existing.audit_run_id,
+            title: existing.title,
+            description: existing.description,
+            category: existing.category,
+            priority: existing.priority,
+            severity: existing.severity,
+            affectedUrl: existing.affected_url,
+            recommendedSolution: existing.recommended_solution,
+            steps: Array.isArray(existing.step_by_step_instructions) ? existing.step_by_step_instructions : [],
+            status: existing.status,
+            verificationStatus: existing.verification_status,
+            dueDate: existing.due_date,
+            createdAt: existing.created_at,
+          };
+        }
+      } catch (e) {
+        // Fallback to insertion
+      }
+    }
+
+    // In-memory duplicate check
+    if (targetFindingId) {
+      const memExisting = storage.getActionItems(item.websiteId).find(
+        a => (a.findingId === targetFindingId || a.sourceId === targetFindingId) &&
+             ['todo', 'in_progress'].includes(a.status)
+      );
+      if (memExisting) return memExisting;
+    }
 
     const taskRow = {
       id: taskId,
@@ -492,13 +809,18 @@ class DatabaseService {
       website_id: item.websiteId,
       source_type: item.sourceType || 'manual',
       source_id: (item.sourceId && isValidUuid(item.sourceId)) ? item.sourceId : null,
+      finding_id: (targetFindingId && isValidUuid(targetFindingId)) ? targetFindingId : null,
+      audit_run_id: (item.auditRunId && isValidUuid(item.auditRunId)) ? item.auditRunId : null,
       title: item.title || 'Untitled Action Item',
       description: item.description || item.title || '',
       category: (item.category as FindingCategory) || 'technical',
       priority: (item.priority as TaskPriority) || 'medium',
+      severity: item.severity || 'medium',
       affected_url: item.affectedUrl || '',
       recommended_solution: item.recommendedSolution || 'Implement optimization.',
       step_by_step_instructions: item.steps || [],
+      verification_criteria: item.verificationCriteria || null,
+      estimated_effort: item.estimatedEffort || 'moderate',
       status: item.status || 'todo',
       verification_status: item.verificationStatus === 'completed_verified' ? 'verified' : (item.verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified'),
       due_date: item.dueDate || null,
@@ -521,10 +843,13 @@ class DatabaseService {
       websiteId: item.websiteId || '',
       sourceType: item.sourceType || 'manual',
       sourceId: item.sourceId,
+      findingId: targetFindingId,
+      auditRunId: item.auditRunId,
       title: item.title || 'Untitled Action Item',
       description: item.description || item.title || '',
       category: (item.category as FindingCategory) || 'technical',
       priority: (item.priority as TaskPriority) || 'medium',
+      severity: item.severity,
       affectedUrl: item.affectedUrl || '',
       recommendedSolution: item.recommendedSolution || '',
       steps: item.steps || [],
@@ -533,6 +858,8 @@ class DatabaseService {
       dueDate: item.dueDate,
       createdAt: item.createdAt || new Date().toISOString(),
     };
+
+    storage.addActionItem(newTask);
 
     await this.logActivity('task_created', 'action_item', newTask.id, { title: newTask.title }, req);
     return newTask;
@@ -570,6 +897,83 @@ class DatabaseService {
 
     await this.logActivity('task_status_updated', 'action_item', id, { status }, req);
     return null;
+  }
+
+  async updateActionItemVerification(
+    id: string,
+    verificationStatus: 'unverified' | 'completed_verified' | 'completed_not_verified' | 'still_unresolved' | 'unable_to_verify',
+    req?: NextRequest | Headers | null
+  ): Promise<void> {
+    if (!id) return;
+    const client = this.getClient(req);
+    const dbStatus = verificationStatus === 'completed_verified' ? 'verified' : (verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified');
+
+    if (client && isValidUuid(id)) {
+      try {
+        await client.from('action_items').update({
+          verification_status: dbStatus,
+          updated_at: new Date().toISOString(),
+        }).eq('id', id);
+      } catch (e: any) {
+        console.warn('Database updateActionItemVerification exception:', e.message);
+      }
+    }
+
+    const item = storage.getActionItems().find(a => a.id === id);
+    if (item) {
+      item.verificationStatus = verificationStatus;
+    }
+  }
+
+  async resolveFinding(findingId: string, req?: NextRequest | Headers | null): Promise<boolean> {
+    if (!findingId) return false;
+    const client = this.getClient(req);
+    if (client && isValidUuid(findingId)) {
+      try {
+        await client.from('audit_findings').update({ is_resolved: true }).eq('id', findingId);
+        return true;
+      } catch (e) {
+        console.error('Database resolveFinding error:', e);
+      }
+    }
+    const finding = storage.getFindings().find(f => f.id === findingId);
+    if (finding) {
+      finding.isResolved = true;
+      return true;
+    }
+    return false;
+  }
+
+  async recordVerificationRun(
+    actionItemId: string,
+    outcome: string,
+    explanation: string,
+    beforeEvidence: string,
+    afterEvidence: string,
+    req?: NextRequest | Headers | null
+  ): Promise<void> {
+    const client = this.getClient(req);
+    if (client && isValidUuid(actionItemId)) {
+      try {
+        const runId = generateUuid();
+        await client.from('verification_runs').insert({
+          id: runId,
+          action_item_id: actionItemId,
+          outcome,
+          explanation,
+          verified_at: new Date().toISOString(),
+        });
+        await client.from('verification_evidence').insert({
+          id: generateUuid(),
+          verification_run_id: runId,
+          before_state: beforeEvidence,
+          after_state: afterEvidence,
+          created_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error('Database recordVerificationRun error:', e);
+      }
+    }
   }
 
   // ==========================================

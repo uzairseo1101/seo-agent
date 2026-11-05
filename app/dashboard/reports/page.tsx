@@ -279,24 +279,30 @@ export default function ReportsPage() {
                 <h3 className="text-sm font-bold font-head text-text uppercase tracking-wider mb-3">
                   3. Google Search Console 28-Day Performance
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                  <div className="p-3 bg-bg rounded-md border border-border">
-                    <span className="text-muted block text-[10px] uppercase font-sans">Total Clicks</span>
-                    <span className="text-base font-bold text-text tnum">{report.searchConsole.totalClicks.toLocaleString()}</span>
+                {report.searchConsole ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                    <div className="p-3 bg-bg rounded-md border border-border">
+                      <span className="text-muted block text-[10px] uppercase font-sans">Total Clicks</span>
+                      <span className="text-base font-bold text-text tnum">{report.searchConsole.totalClicks.toLocaleString()}</span>
+                    </div>
+                    <div className="p-3 bg-bg rounded-md border border-border">
+                      <span className="text-muted block text-[10px] uppercase font-sans">Total Impressions</span>
+                      <span className="text-base font-bold text-text tnum">{report.searchConsole.totalImpressions.toLocaleString()}</span>
+                    </div>
+                    <div className="p-3 bg-bg rounded-md border border-border">
+                      <span className="text-muted block text-[10px] uppercase font-sans">Average CTR</span>
+                      <span className="text-base font-bold text-text tnum">{report.searchConsole.avgCtr}%</span>
+                    </div>
+                    <div className="p-3 bg-bg rounded-md border border-border">
+                      <span className="text-muted block text-[10px] uppercase font-sans">Average Position</span>
+                      <span className="text-base font-bold text-text tnum">{report.searchConsole.avgPosition}</span>
+                    </div>
                   </div>
-                  <div className="p-3 bg-bg rounded-md border border-border">
-                    <span className="text-muted block text-[10px] uppercase font-sans">Total Impressions</span>
-                    <span className="text-base font-bold text-text tnum">{report.searchConsole.totalImpressions.toLocaleString()}</span>
+                ) : (
+                  <div className="p-4 bg-bg rounded-md border border-border text-xs text-muted">
+                    Search Console data is not connected or currently unavailable for this reporting period.
                   </div>
-                  <div className="p-3 bg-bg rounded-md border border-border">
-                    <span className="text-muted block text-[10px] uppercase font-sans">Average CTR</span>
-                    <span className="text-base font-bold text-text tnum">{report.searchConsole.avgCtr}%</span>
-                  </div>
-                  <div className="p-3 bg-bg rounded-md border border-border">
-                    <span className="text-muted block text-[10px] uppercase font-sans">Average Position</span>
-                    <span className="text-base font-bold text-text tnum">{report.searchConsole.avgPosition}</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Methodology Disclosure Statement */}

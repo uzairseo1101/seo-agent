@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { executeWebsiteAudit } from '@/lib/analyzer/audit-engine';
 import { db } from '@/lib/db';
 import { getOrganizationEntitlements } from '@/lib/entitlements';
+import { generateUuid } from '@/lib/utils';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,8 +15,9 @@ export async function POST(req: NextRequest) {
 
     // Resolve website's organization to get exact server-enforced crawl limits
     let orgId: string | null = null;
+    let site = null;
     if (websiteId) {
-      const site = await db.getWebsiteById(websiteId, req);
+      site = await db.getWebsiteById(websiteId, req);
       if (site?.organizationId) {
         orgId = site.organizationId;
       }
@@ -29,13 +31,19 @@ export async function POST(req: NextRequest) {
     const effectiveMaxPages = Math.min(Math.max(requestedPages, 1), maxAllowedPages);
     const effectiveMaxDepth = typeof maxDepth === 'number' ? Math.min(Math.max(maxDepth, 1), 3) : 2;
 
-    const result = await executeWebsiteAudit(websiteId || `web-${Date.now()}`, {
-      maxPages: effectiveMaxPages,
-      maxDepth: effectiveMaxDepth,
-      targetUrl: url,
-      targetDomain: domain,
-      targetName: name,
-    });
+    const result = await executeWebsiteAudit(
+      websiteId || (site?.id as string) || generateUuid(),
+      {
+        maxPages: effectiveMaxPages,
+        maxDepth: effectiveMaxDepth,
+        targetUrl: url || site?.url,
+        targetDomain: domain || site?.domain,
+        targetName: name || site?.name,
+        plan: entitlements.plan,
+        maxAllowedPages,
+      },
+      req
+    );
 
     return NextResponse.json({
       success: true,
@@ -47,6 +55,7 @@ export async function POST(req: NextRequest) {
       findingsCount: result.findings.length,
       scores: {
         seo: result.auditRun.seoScore,
+        technical: result.auditRun.technicalScore,
         geo: result.auditRun.geoScore,
         aeo: result.auditRun.aeoScore,
       },

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test tests/admin-dashboard.test.ts tests/subscriptions-and-entitlements.test.ts tests/phase1-websites-api.test.ts tests/phase2.test.ts tests/phase3.test.ts tests/phase4.test.ts tests/phase5.test.ts tests/phase6.test.ts tests/phase7.test.ts tests/end-to-end-workflow.test.ts"
+    "test": "tsx --test tests/admin-dashboard.test.ts tests/subscriptions-and-entitlements.test.ts tests/phase1-websites-api.test.ts tests/phase2.test.ts tests/phase3.test.ts tests/phase4.test.ts tests/phase5.test.ts tests/phase6.test.ts tests/phase7.test.ts tests/end-to-end-workflow.test.ts tests/audit-and-crawl-engine.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

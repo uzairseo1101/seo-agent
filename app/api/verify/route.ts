@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'taskId is required.' }, { status: 400 });
     }
 
-    const result = await verifyTaskFix(taskId);
+    const result = await verifyTaskFix(taskId, req);
 
     return NextResponse.json({
       success: true,

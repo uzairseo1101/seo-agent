@@ -7,8 +7,10 @@ import {
   AppNotification,
   ClientReport,
   UserProfile,
-  Organization
+  Organization,
+  CrawlJob
 } from './types';
+import { generateUuid } from './utils';
 import {
   mockWebsites,
   mockFindings,
@@ -30,6 +32,7 @@ class StorageService {
   private opportunities: SeoOpportunity[] = [];
   private notifications: AppNotification[] = [];
   private reports: ClientReport[] = [];
+  private crawlJobs: CrawlJob[] = [];
   private currentUser: UserProfile = {
     id: '',
     email: '',
@@ -86,7 +89,7 @@ class StorageService {
   }
 
   addWebsite(data: { name: string; domain: string; url: string; id?: string }): Website {
-    const generatedId = data.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `web-${Date.now()}`);
+    const generatedId = data.id || generateUuid();
     const existingIndex = this.websites.findIndex(w => w.id === generatedId);
     
     const newWebsite: Website = {
@@ -146,6 +149,35 @@ class StorageService {
     }
   }
 
+  // Crawl Jobs
+  getCrawlJobById(id: string): CrawlJob | undefined {
+    return this.crawlJobs.find(j => j.id === id);
+  }
+
+  getLatestCrawlJob(websiteId: string): CrawlJob | undefined {
+    return this.crawlJobs.find(j => j.websiteId === websiteId);
+  }
+
+  saveCrawlJob(job: CrawlJob): CrawlJob {
+    const existingIndex = this.crawlJobs.findIndex(j => j.id === job.id);
+    if (existingIndex >= 0) {
+      this.crawlJobs[existingIndex] = { ...this.crawlJobs[existingIndex], ...job, updatedAt: new Date().toISOString() };
+      return this.crawlJobs[existingIndex];
+    } else {
+      this.crawlJobs.unshift(job);
+      return job;
+    }
+  }
+
+  updateCrawlJob(id: string, updates: Partial<CrawlJob>): CrawlJob | undefined {
+    const job = this.crawlJobs.find(j => j.id === id);
+    if (job) {
+      Object.assign(job, updates, { updatedAt: new Date().toISOString() });
+      return job;
+    }
+    return undefined;
+  }
+
   // Findings
   getFindings(websiteId?: string): AuditFinding[] {
     if (websiteId) {
@@ -178,7 +210,7 @@ class StorageService {
     if (existing) return existing;
 
     const newTask: ActionItem = {
-      id: `act-opp-${Date.now()}`,
+      id: generateUuid(),
       organizationId: this.currentOrg.id,
       websiteId: opp.websiteId,
       sourceType: 'seo_opportunity',
@@ -227,15 +259,18 @@ class StorageService {
     if (existing) return existing;
 
     const newTask: ActionItem = {
-      id: `act-${Date.now()}`,
+      id: generateUuid(),
       organizationId: this.currentOrg.id,
       websiteId: finding.websiteId,
       sourceType: 'audit_finding',
       sourceId: finding.id,
+      findingId: finding.id,
+      auditRunId: finding.auditRunId,
       title: `Fix: ${finding.title}`,
       description: finding.description,
       category: finding.category,
       priority: finding.severity === 'critical' ? 'critical' : finding.severity === 'high' ? 'high' : 'medium',
+      severity: finding.severity,
       affectedUrl: finding.url,
       recommendedSolution: finding.recommendation,
       steps: [
@@ -286,6 +321,11 @@ class StorageService {
   // Reports
   getReports(): ClientReport[] {
     return this.reports;
+  }
+
+  addReport(report: ClientReport): ClientReport {
+    this.reports.unshift(report);
+    return report;
   }
 }
 

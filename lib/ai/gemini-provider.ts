@@ -112,12 +112,22 @@ function generateDeterministicInterpretation(
     affectedUrl: f.url.startsWith('http') ? f.url : `https://${domain}${f.url}`,
     evidenceReference: f.detectionMethod,
     explanation: f.description,
+    businessImpact: f.whyItMatters || `Unresolved ${f.severity} issue directly impairs ${f.category} performance, search visibility, and user trust.`,
+    whyItExists: f.evidence?.actual || 'Detected during crawler DOM & HTTP header analysis.',
     recommendedAction: f.recommendation,
+    implementationSteps: f.implementationSteps || [
+      'Review the affected page template or server configuration.',
+      'Implement the recommended code or content modification.',
+      'Deploy changes to staging/production and verify with crawler.',
+    ],
+    risksOrConsiderations: f.category === 'indexability'
+      ? 'Ensure no intentional staging or utility pages are inadvertently indexed when updating directives.'
+      : 'Review layout responsiveness after heading or metadata changes.',
     reasonForRecommendation: `Resolving this ${f.severity} issue directly improves ${f.category.toUpperCase()} compliance and snippet readability.`,
     prioritySuggestion: f.severity === 'critical' ? ('critical' as const) : f.severity === 'high' ? ('high' as const) : ('medium' as const),
     confidenceBasis: `Verified by direct DOM/HTTP evidence inspection (${f.confidenceLevel} confidence).`,
     limitations: 'Evaluated against crawled page sample; does not predict search engine algorithm shifts.',
-    suggestedVerificationMethod: 'Automated re-crawl of affected URL upon task completion.',
+    suggestedVerificationMethod: f.verificationCriteria || 'Automated re-crawl of affected URL upon task completion.',
   }));
 
   return {
