@@ -41,7 +41,80 @@ export async function verifyTaskFix(
 
   const targetFindingId = task.findingId || (task.sourceType === 'audit_finding' ? task.sourceId : undefined);
 
-  // 2. SSRF validation on affected URL
+  // 2. GSC Baseline Performance Comparison for SEO Opportunity Tasks (Section 8)
+  if ((task.sourceType === 'seo_opportunity' || task.opportunityCategory) && task.baselineMetrics && task.targetKeyword) {
+    try {
+      const gscRows = await db.getGscMetrics(task.websiteId, req);
+      const matchingRows = gscRows.filter(r =>
+        r.query.toLowerCase().trim() === task.targetKeyword!.toLowerCase().trim()
+      );
+
+      if (matchingRows.length > 0) {
+        const latestClicks = matchingRows.reduce((sum, r) => sum + r.clicks, 0);
+        const latestImpressions = matchingRows.reduce((sum, r) => sum + r.impressions, 0);
+        const weightedPos = matchingRows.reduce((sum, r) => sum + r.position * r.impressions, 0);
+        const latestPosition = latestImpressions > 0 ? Math.round((weightedPos / latestImpressions) * 10) / 10 : 0;
+        const latestCtr = latestImpressions > 0 ? Math.round((latestClicks / latestImpressions) * 10000) / 10000 : 0;
+
+        const baseline = task.baselineMetrics;
+        const deltaClicks = latestClicks - baseline.clicks;
+        const deltaClicksPct = baseline.clicks > 0
+          ? Math.round(((deltaClicks / baseline.clicks) * 100) * 10) / 10
+          : (latestClicks > 0 ? 100 : 0);
+        const deltaImpressions = latestImpressions - baseline.impressions;
+        const deltaImpressionsPct = baseline.impressions > 0
+          ? Math.round(((deltaImpressions / baseline.impressions) * 100) * 10) / 10
+          : 0;
+        const deltaCtr = Math.round((latestCtr - baseline.ctr) * 10000) / 10000;
+        const deltaPosition = Math.round((baseline.position - latestPosition) * 10) / 10; // positive = position improved
+
+        const isImproved = (deltaClicks > 0) || (deltaCtr > 0.003 && latestClicks >= baseline.clicks) || (deltaPosition >= 0.5);
+        const outcome: VerificationOutcome = isImproved ? 'completed_verified' : 'not_improved';
+
+        const beforeEvidence = `Baseline Performance: ${baseline.clicks} clicks, ${baseline.impressions.toLocaleString()} imp, CTR ${(baseline.ctr * 100).toFixed(2)}%, position ${baseline.position}.`;
+        const afterEvidence = `Latest GSC Performance: ${latestClicks} clicks (${deltaClicks >= 0 ? '+' : ''}${deltaClicks}, ${deltaClicksPct}%), ${latestImpressions.toLocaleString()} imp (${deltaImpressions >= 0 ? '+' : ''}${deltaImpressions}), CTR ${(latestCtr * 100).toFixed(2)}% (${deltaCtr >= 0 ? '+' : ''}${(deltaCtr * 100).toFixed(2)}%), position ${latestPosition} (${deltaPosition >= 0 ? '+' : ''}${deltaPosition}).`;
+
+        const explanation = isImproved
+          ? `Verified: Search Console metrics show measured improvement over baseline for "${task.targetKeyword}". Clicks: ${baseline.clicks} -> ${latestClicks} (${deltaClicks >= 0 ? '+' : ''}${deltaClicks}, ${deltaClicksPct}%), Position: ${baseline.position} -> ${latestPosition}. Disclaimer: Observed Search Console changes reflect external SERP shifts and do not necessarily prove the task solely caused the improvement.`
+          : `Not Improved: Search Console metrics have not yet exceeded the saved baseline for "${task.targetKeyword}". Clicks: ${baseline.clicks} -> ${latestClicks}, Position: ${baseline.position} -> ${latestPosition}. Additional time or content iterations may be necessary. Note: Observed changes reflect external search shifts and do not prove causality.`;
+
+        // Update task metadata
+        task.latestMetrics = {
+          clicks: latestClicks,
+          impressions: latestImpressions,
+          ctr: latestCtr,
+          position: latestPosition,
+          date: new Date().toISOString(),
+        };
+        task.metricDelta = {
+          clicksChange: deltaClicks,
+          clicksChangePct: deltaClicksPct,
+          impressionsChange: deltaImpressions,
+          impressionsChangePct: deltaImpressionsPct,
+          ctrChange: deltaCtr,
+          positionChange: deltaPosition,
+        };
+        task.verificationStatus = outcome;
+        task.verificationExplanation = explanation;
+
+        await db.updateActionItemVerification(task.id, outcome, req);
+
+        return {
+          taskId,
+          findingId: targetFindingId,
+          outcome,
+          explanation,
+          beforeEvidence,
+          afterEvidence,
+          verifiedAt: new Date().toISOString(),
+        };
+      }
+    } catch (e: any) {
+      console.warn('GSC task verification notice:', e.message);
+    }
+  }
+
+  // 3. SSRF validation on affected URL
   const ssrf = await validateUrlForSsrf(task.affectedUrl);
   if (!ssrf.isValid || !ssrf.normalizedUrl) {
     const outcome: VerificationOutcome = 'unable_to_verify';

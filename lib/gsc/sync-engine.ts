@@ -119,6 +119,15 @@ function generateRealisticGscFixtures(
     { query: `${domain} pricing plans`, path: '/pricing', baseImp: 280, baseClicks: 32, pos: 1.8 },
     { query: 'b2b churn prediction algorithms', path: '/blog/churn-prediction-models', baseImp: 190, baseClicks: 4, pos: 11.3 },
     { query: 'saas ltv to cac ratio benchmarks', path: '/blog/ltv-cac-benchmarks', baseImp: 310, baseClicks: 9, pos: 8.7 },
+    // Question queries (Section 3 & 4.E)
+    { query: 'how to calculate customer churn rate in saas', path: '/blog/customer-retention-metrics', baseImp: 260, baseClicks: 11, pos: 5.2 },
+    { query: 'what is a good net revenue retention rate', path: '/blog/customer-retention-metrics', baseImp: 210, baseClicks: 8, pos: 6.9 },
+    // Commercial investigation & comparison queries (Section 3 & 4)
+    { query: 'best churn prediction tools for enterprise', path: '/features/churn-prediction', baseImp: 340, baseClicks: 15, pos: 4.8 },
+    { query: 'churn modeling vs customer success software', path: '/features/churn-prediction', baseImp: 180, baseClicks: 6, pos: 8.1 },
+    // Zero-click queries (Section 4.B)
+    { query: 'customer retention formula pdf', path: '/templates', baseImp: 190, baseClicks: 0, pos: 6.4 },
+    { query: 'b2b cohort retention curves python', path: '/blog/churn-prediction-models', baseImp: 140, baseClicks: 0, pos: 22.8 },
   ];
 
   for (let d = daysCount; d >= 0; d--) {

@@ -3,6 +3,7 @@ import { analyzeTechnicalSeo } from './technical-seo';
 import { analyzeGeoSignals } from './geo-analyzer';
 import { analyzeAeoSignals } from './aeo-analyzer';
 import { calculateAuditScores, ScoreBreakdown } from './scoring';
+import { discoverSeoOpportunities } from '../gsc/opportunity-engine';
 import { storage } from '../storage';
 import { db } from '../db';
 import { AuditRun, AuditFinding, Website } from '../types';
@@ -171,7 +172,26 @@ export async function executeWebsiteAudit(
     }
   }
 
-  // 11. Emit In-App Notification
+  // 11. Automatically generate updated SEO Opportunities combining audit findings with GSC performance
+  try {
+    const gscRows = await db.getGscMetrics(website.id, req);
+    if (gscRows && gscRows.length > 0) {
+      const opps = discoverSeoOpportunities(website.id, gscRows, {
+        auditFindings: allFindings,
+        brandConfig: {
+          brandNames: [website.name, website.domain.replace(/\..*$/, '')].filter(Boolean),
+        },
+        minImpressions: 50,
+        generateAiOverviewOpps: true,
+        generateGeoAeoOpps: true,
+      });
+      await db.saveOpportunities(website.id, opps, req);
+    }
+  } catch (oppErr: any) {
+    console.warn('Post-audit opportunity discovery notice:', oppErr.message);
+  }
+
+  // 12. Emit In-App Notification
   storage.addNotification({
     id: generateUuid(),
     organizationId: website.organizationId,

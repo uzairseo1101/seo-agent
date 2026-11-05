@@ -217,10 +217,55 @@ export interface GscMetric {
   country?: string;
 }
 
+export type SeoOpportunityCategory =
+  | 'keyword_opportunities'
+  | 'ctr_improvements'
+  | 'question_keywords'
+  | 'content_optimization'
+  | 'technical_seo'
+  | 'internal_linking'
+  | 'content_decay'
+  | 'serp_growth'
+  | 'ai_overviews'
+  | 'geo_aeo';
+
+export interface SeoOpportunityEvidence {
+  gscMetrics?: {
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+    deltaClicks?: number;
+    deltaImpressions?: number;
+    deltaPosition?: number;
+    benchmarkCtr?: number;
+  };
+  auditFindingIds?: string[];
+  auditFindings?: Array<{
+    id: string;
+    title: string;
+    issueType: string;
+    severity: string;
+    url: string;
+    evidence?: any;
+  }>;
+  keywordClassification?: {
+    intent?: 'informational' | 'commercial' | 'transactional' | 'navigational';
+    isQuestion?: boolean;
+    isBranded?: boolean;
+    isLongTail?: boolean;
+    matchedPattern?: string;
+  };
+  textProof?: string;
+  dataPoints?: Record<string, any>;
+}
+
 export interface SeoOpportunity {
   id: string;
   websiteId: string;
-  type: 'high_impressions_low_ctr' | 'striking_distance_5_20' | 'declining_ctr' | 'content_expansion';
+  type: string; // Backward compatible with 'high_impressions_low_ctr' | 'striking_distance_5_20' | etc.
+  category?: SeoOpportunityCategory;
+  title?: string;
   query: string;
   pageUrl: string;
   impressions: number;
@@ -228,14 +273,57 @@ export interface SeoOpportunity {
   ctr: number;
   position: number;
   potentialImpact: 'critical' | 'high' | 'medium' | 'low';
-  hypothesis: string;
+  priority?: 'critical' | 'high' | 'medium' | 'low';
+  confidenceLevel?: 'high' | 'medium' | 'low';
+  hypothesis: string; // Why this is an opportunity
+  whyItMatters?: string;
+  expertExplanation?: string;
   recommendedAction: string;
+  recommendedStrategy?: string;
+  implementationSteps?: string[];
+  expectedBenefit?: string;
+  verificationMethod?: string;
+  evidence?: SeoOpportunityEvidence;
   status: 'open' | 'actioned' | 'dismissed';
+  createdAt?: string;
 }
 
 export type TaskPriority = 'critical' | 'high' | 'medium' | 'low';
-export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'dismissed';
-export type VerificationOutcome = 'unverified' | 'completed_verified' | 'completed_not_verified' | 'still_unresolved' | 'unable_to_verify';
+export type TaskStatus =
+  | 'todo'
+  | 'in_progress'
+  | 'completed'
+  | 'verification_pending'
+  | 'verified'
+  | 'not_improved'
+  | 'dismissed';
+
+export type VerificationOutcome =
+  | 'unverified'
+  | 'completed_verified'
+  | 'completed_not_verified'
+  | 'still_unresolved'
+  | 'unable_to_verify'
+  | 'verified'
+  | 'not_improved';
+
+export interface ActionItemBaselineMetrics {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  date?: string;
+  dateRange?: string;
+}
+
+export interface ActionItemMetricDelta {
+  clicksChange: number;
+  clicksChangePct: number;
+  impressionsChange: number;
+  impressionsChangePct: number;
+  ctrChange: number;
+  positionChange: number;
+}
 
 export interface ActionItem {
   id: string;
@@ -261,6 +349,18 @@ export interface ActionItem {
   completedAt?: string;
   userNotes?: string;
   createdAt: string;
+
+  // Extended SEO Opportunity & Action Center Fields
+  targetKeyword?: string;
+  opportunityCategory?: string;
+  baselineMetrics?: ActionItemBaselineMetrics;
+  latestMetrics?: ActionItemBaselineMetrics;
+  metricDelta?: ActionItemMetricDelta;
+  expectedOutcome?: string;
+  evidenceSummary?: string;
+  relatedAuditFindings?: any[];
+  verificationExplanation?: string;
+  verificationMethod?: string;
 }
 
 export interface AppNotification {

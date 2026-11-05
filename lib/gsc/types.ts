@@ -84,3 +84,77 @@ export interface TrafficDropComparison {
     hypothesis: string;
   }>;
 }
+
+export type GscIntentType =
+  | 'all'
+  | 'questions'
+  | 'informational'
+  | 'commercial'
+  | 'transactional'
+  | 'branded'
+  | 'non_branded'
+  | 'custom_regex';
+
+export interface BrandConfiguration {
+  brandNames: string[];
+  competitorNames?: string[];
+}
+
+export interface GscKeywordAnalysisQuery {
+  query: string;
+  topPage: string;
+  pages: string[];
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  intent: 'informational' | 'commercial' | 'transactional' | 'navigational';
+  isQuestion: boolean;
+  isBranded: boolean;
+  isCompetitor: boolean;
+  isLongTail: boolean;
+  matchedPattern?: string;
+  positionBracket: 'pos_1_3' | 'pos_4_10' | 'pos_11_20' | 'pos_21_plus';
+  expectedCtrBenchmark: number;
+  ctrHealth: 'strong' | 'average' | 'underperforming';
+}
+
+export interface GscKeywordAnalysisPage {
+  pageUrl: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  avgPosition: number;
+  topQueries: string[];
+  queryCount: number;
+  hasCrawlFindings?: boolean;
+}
+
+export interface GscKeywordAnalysisSummary {
+  totalQueries: number;
+  filteredQueries: number;
+  totalClicks: number;
+  totalImpressions: number;
+  avgCtr: number;
+  avgPosition: number;
+  brandedClicks: number;
+  nonBrandedClicks: number;
+  brandedClicksPct: number;
+  nonBrandedClicksPct: number;
+  questionsCount: number;
+  zeroClickCount: number;
+  strikingDistanceCount: number;
+  datasetScopeNote: string;
+}
+
+export interface GscKeywordAnalysisResult {
+  queries: GscKeywordAnalysisQuery[];
+  pages: GscKeywordAnalysisPage[];
+  summary: GscKeywordAnalysisSummary;
+  regexValidation: {
+    isValid: boolean;
+    patternUsed?: string;
+    errorMessage?: string;
+    syntaxHelp: string;
+  };
+}

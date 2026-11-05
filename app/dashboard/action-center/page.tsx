@@ -28,7 +28,8 @@ import {
   Sparkles,
   CheckCircle,
   XCircle,
-  ChevronRight
+  ChevronRight,
+  Target
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -301,18 +302,18 @@ export default function ActionCenterPage() {
           <div className="p-5 rounded-xl bg-card border-2 border-primary shadow-xs animate-in fade-in space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                {verificationFeedback.outcome === 'completed_verified' ? (
+                {verificationFeedback.outcome === 'completed_verified' || verificationFeedback.outcome === 'verified' ? (
                   <span className="flex items-center gap-1.5 text-xs font-mono font-bold text-primary bg-primary-tint border border-emerald-200 px-2.5 py-1 rounded-full">
                     <CheckCircle2 className="w-4 h-4 text-primary" />
-                    Completed — Verified
+                    Verified Fix & Improvement
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-xs font-mono font-bold text-warning bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
                     <AlertTriangle className="w-4 h-4 text-warning" />
-                    Still Unresolved
+                    {verificationFeedback.outcome === 'not_improved' ? 'Not Improved' : 'Still Unresolved'}
                   </span>
                 )}
-                <span className="text-xs font-bold font-head text-text">Re-Crawl Verification Result</span>
+                <span className="text-xs font-bold font-head text-text">Task Verification & Impact Evaluation</span>
               </div>
               <button
                 onClick={() => setVerificationFeedback(null)}
@@ -321,11 +322,14 @@ export default function ActionCenterPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-xs text-muted leading-relaxed">
+            <p className="text-xs text-text leading-relaxed">
               {verificationFeedback.explanation}
             </p>
-            <div className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-border font-mono text-[11px] text-text">
+            <div className="p-3 rounded-lg bg-bg border border-border font-mono text-[11px] text-text">
               Evidence captured: {verificationFeedback.afterEvidence}
+            </div>
+            <div className="text-[11px] text-muted italic pt-1 border-t border-border">
+              Important: Observed Search Console changes reflect external search shifts and do not necessarily prove the task solely caused the improvement.
             </div>
           </div>
         )}
@@ -341,9 +345,12 @@ export default function ActionCenterPage() {
                 className="text-xs font-medium px-3 h-9 rounded-lg border border-border bg-card text-text outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-xs"
               >
                 <option value="all">All Statuses ({tasks.length})</option>
-                <option value="todo">To Do</option>
+                <option value="todo">New / To Do</option>
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
+                <option value="verification_pending">Verification Pending</option>
+                <option value="verified">Verified</option>
+                <option value="not_improved">Not Improved</option>
                 <option value="dismissed">Dismissed</option>
               </select>
             </div>
@@ -408,15 +415,19 @@ export default function ActionCenterPage() {
 
                   {/* Verification Outcome & Actions */}
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    {task.verificationStatus === 'completed_verified' ? (
+                    {task.verificationStatus === 'completed_verified' || task.verificationStatus === 'verified' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-primary-tint text-primary border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                         Completed — Verified
                       </span>
-                    ) : task.verificationStatus === 'still_unresolved' ? (
+                    ) : task.verificationStatus === 'still_unresolved' || task.verificationStatus === 'not_improved' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2.5 py-0.5 rounded-full bg-red-50 text-error border border-red-200">
                         <AlertTriangle className="w-3.5 h-3.5 text-error" />
-                        Still Unresolved
+                        {task.verificationStatus === 'not_improved' ? 'Not Improved' : 'Still Unresolved'}
+                      </span>
+                    ) : task.status === 'verification_pending' ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-blue-50 text-accent border border-blue-200">
+                        <Clock className="w-3.5 h-3.5" /> Verification Pending
                       </span>
                     ) : task.status === 'completed' ? (
                       <span className="inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-amber-50 text-warning border border-amber-200">
@@ -439,21 +450,84 @@ export default function ActionCenterPage() {
                       onClick={() => handleVerifyTask(task.id)}
                       disabled={verifyingTaskId === task.id}
                       className="inline-flex items-center gap-1 text-xs font-medium px-2.5 h-8 rounded-md border border-border bg-card hover:bg-slate-50 text-text transition-colors shadow-xs disabled:opacity-50"
-                      title="Re-crawl URL to verify fix"
+                      title="Re-crawl URL or re-evaluate GSC metrics to verify task"
                     >
                       <RefreshCw className={`w-3 h-3 text-primary ${verifyingTaskId === task.id ? 'animate-spin' : ''}`} />
-                      <span>{verifyingTaskId === task.id ? 'Verifying...' : 'Verify Fix Now'}</span>
+                      <span>{verifyingTaskId === task.id ? 'Verifying...' : 'Verify Fix / Impact'}</span>
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold font-head text-text">{task.title}</h3>
+                  <h3 className="text-sm font-bold font-head text-text flex items-center gap-2">
+                    {task.targetKeyword ? (
+                      <Target className="w-4 h-4 text-primary shrink-0" />
+                    ) : null}
+                    <span>{task.title}</span>
+                  </h3>
+                  {task.targetKeyword && (
+                    <p className="text-xs font-semibold text-primary mt-0.5">
+                      Target Query: &ldquo;{task.targetKeyword}&rdquo;
+                    </p>
+                  )}
                   <p className="text-xs text-muted mt-1 leading-relaxed">{task.description}</p>
                   <p className="text-xs font-mono text-muted mt-1 truncate">
                     Target: {task.affectedUrl}
                   </p>
                 </div>
+
+                {/* Baseline & Latest GSC Performance Comparison (Section 8) */}
+                {task.baselineMetrics && (
+                  <div className="p-3 rounded-lg bg-bg border border-border font-mono text-xs space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-sans font-bold text-muted uppercase">
+                      <span>Performance Baseline vs Latest</span>
+                      {task.baselineMetrics.date && (
+                        <span>Established {new Date(task.baselineMetrics.date).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="bg-card p-2 rounded border border-border">
+                        <span className="text-[10px] text-muted block uppercase font-sans">Baseline Clicks</span>
+                        <span className="font-bold text-text tnum">{task.baselineMetrics.clicks}</span>
+                        {task.latestMetrics && task.metricDelta && (
+                          <span className={`block text-[10px] ${task.metricDelta.clicksChange >= 0 ? 'text-primary' : 'text-error'}`}>
+                            Latest: {task.latestMetrics.clicks} ({task.metricDelta.clicksChange >= 0 ? '+' : ''}{task.metricDelta.clicksChange})
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="bg-card p-2 rounded border border-border">
+                        <span className="text-[10px] text-muted block uppercase font-sans">Baseline Impressions</span>
+                        <span className="font-bold text-text tnum">{task.baselineMetrics.impressions.toLocaleString()}</span>
+                        {task.latestMetrics && task.metricDelta && (
+                          <span className={`block text-[10px] ${task.metricDelta.impressionsChange >= 0 ? 'text-primary' : 'text-error'}`}>
+                            Latest: {task.latestMetrics.impressions.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="bg-card p-2 rounded border border-border">
+                        <span className="text-[10px] text-muted block uppercase font-sans">Baseline CTR</span>
+                        <span className="font-bold text-text tnum">{(task.baselineMetrics.ctr * 100).toFixed(2)}%</span>
+                        {task.latestMetrics && (
+                          <span className="block text-[10px] text-muted">
+                            Latest: {(task.latestMetrics.ctr * 100).toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="bg-card p-2 rounded border border-border">
+                        <span className="text-[10px] text-muted block uppercase font-sans">Baseline Position</span>
+                        <span className="font-bold text-text tnum">{task.baselineMetrics.position}</span>
+                        {task.latestMetrics && task.metricDelta && (
+                          <span className={`block text-[10px] ${task.metricDelta.positionChange >= 0 ? 'text-primary' : 'text-error'}`}>
+                            Latest: {task.latestMetrics.position} ({task.metricDelta.positionChange >= 0 ? '+' : ''}{task.metricDelta.positionChange})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Steps Box */}
                 <div className="p-3.5 rounded-lg bg-bg border border-border text-xs space-y-1.5">
@@ -474,9 +548,12 @@ export default function ActionCenterPage() {
                       onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
                       className="text-xs font-medium px-2.5 h-8 rounded-lg border border-border bg-card text-text outline-none cursor-pointer focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-xs"
                     >
-                      <option value="todo">To Do</option>
+                      <option value="todo">New / To Do</option>
                       <option value="in_progress">In Progress</option>
                       <option value="completed">Completed</option>
+                      <option value="verification_pending">Verification Pending</option>
+                      <option value="verified">Verified</option>
+                      <option value="not_improved">Not Improved</option>
                       <option value="dismissed">Dismissed</option>
                     </select>
                   </div>

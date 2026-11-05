@@ -10,6 +10,7 @@ import {
   Organization,
   CrawlJob
 } from './types';
+import { GscPerformanceRow } from './gsc/types';
 import { generateUuid } from './utils';
 import {
   mockWebsites,
@@ -33,6 +34,7 @@ class StorageService {
   private notifications: AppNotification[] = [];
   private reports: ClientReport[] = [];
   private crawlJobs: CrawlJob[] = [];
+  private gscPerformance: Map<string, GscPerformanceRow[]> = new Map();
   private currentUser: UserProfile = {
     id: '',
     email: '',
@@ -186,6 +188,15 @@ class StorageService {
     return this.findings;
   }
 
+  // GSC Performance Data
+  getGscPerformance(websiteId: string): GscPerformanceRow[] {
+    return this.gscPerformance.get(websiteId) || [];
+  }
+
+  saveGscPerformance(websiteId: string, rows: GscPerformanceRow[]): void {
+    this.gscPerformance.set(websiteId, rows);
+  }
+
   // Opportunities
   getOpportunities(websiteId?: string): SeoOpportunity[] {
     if (websiteId) {
@@ -206,8 +217,26 @@ class StorageService {
     const opp = this.opportunities.find(o => o.id === oppId);
     if (!opp) return null;
 
-    const existing = this.actionItems.find(a => a.sourceId === oppId);
+    // Check duplicate by sourceId or by website + targetKeyword + affectedUrl
+    const existing = this.actionItems.find(a => 
+      a.sourceId === oppId || 
+      (a.websiteId === opp.websiteId && a.targetKeyword?.toLowerCase() === opp.query.toLowerCase() && a.affectedUrl === opp.pageUrl && ['todo', 'in_progress', 'verification_pending'].includes(a.status))
+    );
     if (existing) return existing;
+
+    // Map opportunity category to Action Item category constraint ('technical' | 'content' | 'geo' | 'aeo' | 'indexability')
+    let taskCategory: ActionItem['category'] = 'content';
+    if (opp.category === 'technical_seo') taskCategory = 'technical';
+    else if (opp.category === 'internal_linking') taskCategory = 'technical';
+    else if (opp.category === 'geo_aeo') taskCategory = 'geo';
+    else if (opp.category === 'ai_overviews') taskCategory = 'aeo';
+
+    const defaultSteps = [
+      `Review SERP snippet ranking for query: "${opp.query}"`,
+      `Update title and meta description on ${opp.pageUrl} to align with search intent`,
+      `Add contextual internal link anchors from related blog or category articles`,
+      `Request re-indexing via Google Search Console`,
+    ];
 
     const newTask: ActionItem = {
       id: generateUuid(),
@@ -215,18 +244,27 @@ class StorageService {
       websiteId: opp.websiteId,
       sourceType: 'seo_opportunity',
       sourceId: opp.id,
-      title: `Optimize: "${opp.query}"`,
+      title: opp.title || `Optimize: "${opp.query}"`,
       description: opp.hypothesis,
-      category: 'content',
-      priority: opp.potentialImpact === 'critical' ? 'critical' : opp.potentialImpact === 'high' ? 'high' : 'medium',
+      category: taskCategory,
+      priority: opp.priority || (opp.potentialImpact === 'critical' ? 'critical' : opp.potentialImpact === 'high' ? 'high' : 'medium'),
       affectedUrl: opp.pageUrl,
       recommendedSolution: opp.recommendedAction,
-      steps: [
-        `Review SERP snippet ranking for query: "${opp.query}"`,
-        `Update title and meta description on ${opp.pageUrl} to align with search intent`,
-        `Add contextual internal link anchors from related blog or category articles`,
-        `Request re-indexing via Google Search Console`,
-      ],
+      steps: opp.implementationSteps && opp.implementationSteps.length > 0 ? opp.implementationSteps : defaultSteps,
+      targetKeyword: opp.query,
+      opportunityCategory: opp.category || opp.type,
+      baselineMetrics: {
+        clicks: opp.clicks,
+        impressions: opp.impressions,
+        ctr: opp.ctr,
+        position: opp.position,
+        date: new Date().toISOString(),
+      },
+      expectedOutcome: opp.expectedBenefit || 'Improve organic click capture and search visibility.',
+      evidenceSummary: opp.hypothesis,
+      relatedAuditFindings: opp.evidence?.auditFindings || [],
+      verificationCriteria: opp.verificationMethod || `Verify improved GSC clicks and CTR for "${opp.query}" post-optimization.`,
+      verificationMethod: opp.verificationMethod,
       status: 'todo',
       verificationStatus: 'unverified',
       dueDate: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],

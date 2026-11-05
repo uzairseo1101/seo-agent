@@ -24,7 +24,27 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, description, category, priority, affectedUrl, recommendedSolution, websiteId, dueDate } = body;
+    const {
+      title,
+      description,
+      category,
+      priority,
+      affectedUrl,
+      recommendedSolution,
+      websiteId,
+      dueDate,
+      sourceType = 'manual',
+      sourceId,
+      steps,
+      targetKeyword,
+      opportunityCategory,
+      baselineMetrics,
+      expectedOutcome,
+      evidenceSummary,
+      relatedAuditFindings,
+      verificationCriteria,
+      verificationMethod,
+    } = body;
 
     if (!title || !affectedUrl) {
       return NextResponse.json({ success: false, error: 'Title and Affected URL are required.' }, { status: 400 });
@@ -37,26 +57,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Please connect a website before creating tasks.' }, { status: 400 });
     }
 
+    const defaultSteps = [
+      'Review current URL implementation',
+      'Execute required optimization',
+      'Deploy changes to production',
+      'Mark task completed and run verification re-check',
+    ];
+
     const newTask = await db.createActionItem({
       organizationId: auth.organizationId,
       websiteId: targetWebId,
-      sourceType: 'manual',
+      sourceType,
+      sourceId,
       title,
       description: description || title,
       category: (category as FindingCategory) || 'technical',
       priority: (priority as TaskPriority) || 'medium',
       affectedUrl,
       recommendedSolution: recommendedSolution || 'Implement on-page optimization.',
-      steps: [
-        'Review current URL implementation',
-        'Execute required optimization',
-        'Deploy changes to production',
-        'Mark task completed and run verification re-check',
-      ],
+      steps: Array.isArray(steps) && steps.length > 0 ? steps : defaultSteps,
       status: 'todo',
       verificationStatus: 'unverified',
       dueDate: dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
+      targetKeyword,
+      opportunityCategory,
+      baselineMetrics,
+      expectedOutcome,
+      evidenceSummary,
+      relatedAuditFindings,
+      verificationCriteria,
+      verificationMethod,
     }, req);
 
     return NextResponse.json({ success: true, task: newTask });

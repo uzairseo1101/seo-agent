@@ -8,8 +8,10 @@ import {
   AuditRun,
   AuditFinding,
   ActionItem,
+  SeoOpportunity,
   UserProfile,
   TaskStatus,
+  VerificationOutcome,
   FindingCategory,
   TaskPriority,
   CrawlJob,
@@ -17,6 +19,7 @@ import {
   FindingSeverity,
   FindingType,
 } from '@/lib/types';
+import { GscPerformanceRow } from '@/lib/gsc/types';
 
 /**
  * Unified Multi-Tenant Database Access Layer.
@@ -736,12 +739,23 @@ class DatabaseService {
           completedAt: row.completed_at || undefined,
           userNotes: row.user_notes || undefined,
           createdAt: row.created_at || new Date().toISOString(),
+          targetKeyword: row.target_keyword || undefined,
+          opportunityCategory: row.opportunity_category || undefined,
+          baselineMetrics: row.baseline_metrics || undefined,
+          latestMetrics: row.latest_metrics || undefined,
+          metricDelta: row.metric_delta || undefined,
+          expectedOutcome: row.expected_outcome || undefined,
+          evidenceSummary: row.evidence_summary || undefined,
+          relatedAuditFindings: row.related_audit_findings || undefined,
+          verificationCriteria: row.verification_criteria || undefined,
+          verificationMethod: row.verification_method || undefined,
+          verificationExplanation: row.verification_explanation || undefined,
         }));
       }
     } catch (e) {
       console.error('Database getActionItems error:', e);
     }
-    return [];
+    return storage.getActionItems(websiteId);
   }
 
   async createActionItem(item: Partial<ActionItem>, req?: NextRequest | Headers | null): Promise<ActionItem> {
@@ -755,7 +769,7 @@ class DatabaseService {
     const client = this.getClient(req);
     const targetFindingId = item.findingId || (item.sourceType === 'audit_finding' ? item.sourceId : undefined);
 
-    // Prevent duplicate tasks for the same unresolved finding
+    // 1. Deduplication for Audit Findings
     if (client && item.websiteId && targetFindingId && isValidUuid(targetFindingId)) {
       try {
         const { data: existing } = await client
@@ -763,7 +777,7 @@ class DatabaseService {
           .select('*')
           .eq('website_id', item.websiteId)
           .or(`finding_id.eq.${targetFindingId},source_id.eq.${targetFindingId}`)
-          .in('status', ['todo', 'in_progress'])
+          .in('status', ['todo', 'in_progress', 'verification_pending'])
           .maybeSingle();
 
         if (existing) {
@@ -794,16 +808,26 @@ class DatabaseService {
       }
     }
 
-    // In-memory duplicate check
+    // 2. In-memory duplicate check (covers both findings and SEO opportunity tasks)
+    const memTasks = storage.getActionItems(item.websiteId);
     if (targetFindingId) {
-      const memExisting = storage.getActionItems(item.websiteId).find(
+      const memExisting = memTasks.find(
         a => (a.findingId === targetFindingId || a.sourceId === targetFindingId) &&
-             ['todo', 'in_progress'].includes(a.status)
+             ['todo', 'in_progress', 'verification_pending'].includes(a.status)
       );
       if (memExisting) return memExisting;
     }
 
-    const taskRow = {
+    if (item.sourceType === 'seo_opportunity') {
+      const oppDuplicate = memTasks.find(
+        a => (a.sourceId === item.sourceId ||
+             (item.targetKeyword && a.targetKeyword?.toLowerCase() === item.targetKeyword.toLowerCase() && a.affectedUrl === item.affectedUrl)) &&
+             ['todo', 'in_progress', 'verification_pending'].includes(a.status)
+      );
+      if (oppDuplicate) return oppDuplicate;
+    }
+
+    const taskRow: any = {
       id: taskId,
       organization_id: orgId,
       website_id: item.websiteId,
@@ -831,7 +855,16 @@ class DatabaseService {
     if (client) {
       try {
         const { error } = await client.from('action_items').insert(taskRow);
-        if (error) console.error('Database createActionItem error:', error);
+        if (error) {
+          // If the remote Supabase database hasn't applied the latest migration yet, fallback to core columns
+          if (error.code === 'PGRST204') {
+            const { audit_run_id, finding_id, verification_criteria, estimated_effort, ...coreTaskRow } = taskRow;
+            const { error: retryError } = await client.from('action_items').insert(coreTaskRow);
+            if (retryError) console.warn('Database createActionItem fallback notice:', retryError.message);
+          } else {
+            console.error('Database createActionItem error:', error);
+          }
+        }
       } catch (e) {
         console.error('Database createActionItem fallback:', e);
       }
@@ -857,6 +890,17 @@ class DatabaseService {
       verificationStatus: item.verificationStatus || 'unverified',
       dueDate: item.dueDate,
       createdAt: item.createdAt || new Date().toISOString(),
+      targetKeyword: item.targetKeyword,
+      opportunityCategory: item.opportunityCategory,
+      baselineMetrics: item.baselineMetrics,
+      latestMetrics: item.latestMetrics,
+      metricDelta: item.metricDelta,
+      expectedOutcome: item.expectedOutcome,
+      evidenceSummary: item.evidenceSummary,
+      relatedAuditFindings: item.relatedAuditFindings,
+      verificationCriteria: item.verificationCriteria,
+      verificationMethod: item.verificationMethod,
+      verificationExplanation: item.verificationExplanation,
     };
 
     storage.addActionItem(newTask);
@@ -901,12 +945,14 @@ class DatabaseService {
 
   async updateActionItemVerification(
     id: string,
-    verificationStatus: 'unverified' | 'completed_verified' | 'completed_not_verified' | 'still_unresolved' | 'unable_to_verify',
+    verificationStatus: VerificationOutcome,
     req?: NextRequest | Headers | null
   ): Promise<void> {
     if (!id) return;
     const client = this.getClient(req);
-    const dbStatus = verificationStatus === 'completed_verified' ? 'verified' : (verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified');
+    const dbStatus = (verificationStatus === 'completed_verified' || verificationStatus === 'verified')
+      ? 'verified'
+      : (verificationStatus === 'still_unresolved' ? 'unresolved' : 'unverified');
 
     if (client && isValidUuid(id)) {
       try {
@@ -1082,6 +1128,156 @@ class DatabaseService {
       }
     }
     return true;
+  }
+
+  // ==========================================
+  // GSC PERFORMANCE & SEARCH METRICS
+  // ==========================================
+  async saveGscMetrics(websiteId: string, rows: GscPerformanceRow[], req?: NextRequest | Headers | null): Promise<void> {
+    storage.saveGscPerformance(websiteId, rows);
+
+    const client = this.getClient(req);
+    if (client && isValidUuid(websiteId) && rows.length > 0) {
+      try {
+        const dbRows = rows.map(r => ({
+          id: generateUuid(),
+          website_id: websiteId,
+          date: r.date,
+          page_url: r.page,
+          query: r.query,
+          clicks: r.clicks,
+          impressions: r.impressions,
+          ctr: r.ctr,
+          position: r.position,
+          device: r.device || 'desktop',
+          country: r.country || 'global',
+        }));
+
+        // Batch insert up to 1000 rows
+        const batch = dbRows.slice(0, 1000);
+        await client.from('gsc_metrics').insert(batch);
+      } catch (e: any) {
+        console.warn('Database saveGscMetrics notice:', e.message);
+      }
+    }
+  }
+
+  async getGscMetrics(websiteId: string, req?: NextRequest | Headers | null): Promise<GscPerformanceRow[]> {
+    const memRows = storage.getGscPerformance(websiteId);
+    if (memRows.length > 0) return memRows;
+
+    const client = this.getClient(req);
+    if (client && isValidUuid(websiteId)) {
+      try {
+        const { data, error } = await client
+          .from('gsc_metrics')
+          .select('*')
+          .eq('website_id', websiteId)
+          .order('date', { ascending: false })
+          .limit(1000);
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const rows: GscPerformanceRow[] = data.map((d: any) => ({
+            date: d.date,
+            page: d.page_url,
+            query: d.query || '',
+            clicks: d.clicks || 0,
+            impressions: d.impressions || 0,
+            ctr: Number(d.ctr) || 0,
+            position: Number(d.position) || 0,
+            device: d.device || 'desktop',
+            country: d.country || 'global',
+          }));
+          storage.saveGscPerformance(websiteId, rows);
+          return rows;
+        }
+      } catch (e) {
+        // Fallback to memory
+      }
+    }
+    return memRows;
+  }
+
+  // ==========================================
+  // SEO OPPORTUNITIES
+  // ==========================================
+  async getOpportunities(websiteId?: string, req?: NextRequest | Headers | null): Promise<SeoOpportunity[]> {
+    const memOpps = storage.getOpportunities(websiteId);
+    if (memOpps.length > 0) return memOpps;
+
+    const client = this.getClient(req);
+    if (client && websiteId && isValidUuid(websiteId)) {
+      try {
+        const { data, error } = await client
+          .from('seo_opportunities')
+          .select('*')
+          .eq('website_id', websiteId)
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const mapped: SeoOpportunity[] = data.map((d: any) => ({
+            id: d.id,
+            websiteId: d.website_id,
+            type: d.type,
+            category: d.category || 'keyword_opportunities',
+            title: d.title || `Opportunity: "${d.query}"`,
+            query: d.query,
+            pageUrl: d.page_url,
+            impressions: d.impressions || 0,
+            clicks: d.clicks || 0,
+            ctr: Number(d.ctr) || 0,
+            position: Number(d.position) || 0,
+            potentialImpact: d.potential_impact || 'medium',
+            priority: d.priority || d.potential_impact || 'medium',
+            confidenceLevel: d.confidence_level || 'high',
+            hypothesis: d.hypothesis,
+            whyItMatters: d.why_it_matters || d.hypothesis,
+            expertExplanation: d.expert_explanation || d.hypothesis,
+            recommendedAction: d.recommended_action,
+            recommendedStrategy: d.recommended_strategy || d.recommended_action,
+            implementationSteps: Array.isArray(d.implementation_steps) ? d.implementation_steps : [],
+            expectedBenefit: d.expected_benefit || '',
+            verificationMethod: d.verification_method || '',
+            status: d.status || 'open',
+            createdAt: d.created_at,
+          }));
+          storage.saveOpportunities(websiteId, mapped);
+          return mapped;
+        }
+      } catch (e) {
+        // Fallback to storage
+      }
+    }
+    return memOpps;
+  }
+
+  async saveOpportunities(websiteId: string, opps: SeoOpportunity[], req?: NextRequest | Headers | null): Promise<void> {
+    storage.saveOpportunities(websiteId, opps);
+
+    const client = this.getClient(req);
+    if (client && isValidUuid(websiteId) && opps.length > 0) {
+      try {
+        const dbRows = opps.map(o => ({
+          id: isValidUuid(o.id) ? o.id : generateUuid(),
+          website_id: websiteId,
+          type: o.type,
+          query: o.query,
+          page_url: o.pageUrl,
+          impressions: o.impressions,
+          clicks: o.clicks,
+          ctr: o.ctr,
+          position: o.position,
+          potential_impact: o.potentialImpact,
+          hypothesis: o.hypothesis,
+          recommended_action: o.recommendedAction,
+          status: o.status,
+          created_at: o.createdAt || new Date().toISOString(),
+        }));
+        await client.from('seo_opportunities').insert(dbRows);
+      } catch (e: any) {
+        console.warn('Database saveOpportunities notice:', e.message);
+      }
+    }
   }
 
   // ==========================================
